@@ -106,8 +106,12 @@ What was tried, all with the wheels in view:
 - **576 probe packets** on `ffa1` (`index.html` probe panel): known brick-hub protocols (LEGO PU, BuWizz,
   SBrick, Circuit Cubes), every single byte, `[cmd, speed]` pairs, per-motor 4-byte, 8/20-byte padded,
   common headers with sum/xor/length, ASCII. Every write accepted, `ffa2` never changed, no wheel moved.
-  Once, during the full run, the car LED switched from solid to **fast blinking** while the BLE link stayed up:
-  the firmware does parse writes. Packets 1–288 alone don't do it; 289–576 not yet bisected.
+  Once, during the full run, the car LED switched from solid to **fast blinking** (its "waiting for a
+  controller" pattern, also shown right after power-on) while the BLE link stayed up. Bisected to the first
+  20-byte packet; then narrowed with zero-filled writes: **10 and 16 bytes are fine, 19 bytes already trigger
+  it**. So it is an error path for oversized writes (short receive buffer), not a command, and real frames are
+  ≤ 16–18 bytes. Everything after the first 20-byte packet in that run (`20B 01..3f ff`) was sent in the error
+  state and does not count; those are > 16 bytes anyway.
 - **XC-7 frames streamed** every 100 ms for 2 s per direction/slider: nothing.
 - **The remote is not BLE**: an ESP32 cloning the car exactly (name, address, advertisement bytes, service)
   got no connection; with the car's address as a BLE central it heard no directed or other advertising from the
