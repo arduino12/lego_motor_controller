@@ -24,7 +24,8 @@
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,Segoe UI,Roboto,sans-serif}
 header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:5}
 header h1{font-size:17px;margin:0 12px 0 0}
-button,select,input[type=text]{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
+textarea{width:100%;font:12px var(--mono);color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px;resize:vertical}
+button,select,input[type=text],input[type=number]{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
 button{cursor:pointer;user-select:none;touch-action:manipulation}
 button:hover{border-color:var(--acc)}
 button.primary{background:var(--acc);border-color:var(--acc);color:#fff}
@@ -71,7 +72,7 @@ kbd{font:12px var(--mono);border:1px solid var(--line);border-radius:4px;padding
   <button class="primary" id="btnAdd" title="Pick a motor (JG_JMC-…) from the Bluetooth chooser">+ Add motor</button>
   <button id="btnAddAll" title="Show every nearby BLE device">+ Add (show all)</button>
   <span class="spacer"></span>
-  <span class="hint"><kbd>Space</kbd> stop all · <kbd>1</kbd>–<kbd>9</kbd> select · <kbd>↑</kbd><kbd>↓</kbd> speed ±10 · <kbd>W A S D</kbd><kbd>Q E</kbd> car</span>
+  <span class="hint"><kbd>Space</kbd> stop all · <kbd>1</kbd>–<kbd>9</kbd> select · <kbd>↑</kbd><kbd>↓</kbd> speed ±10 · <kbd>W A S D</kbd><kbd>Q E</kbd> car · <kbd>R</kbd> probe hit</span>
   <button class="stop" id="btnStopAll">STOP ALL</button>
 </header>
 <main>
@@ -95,7 +96,11 @@ kbd{font:12px var(--mono);border:1px solid var(--line);border-radius:4px;padding
  * ==================================================================== */
 const SVC = 0xfff0, CH_WRITE = 0xfff2, CH_NOTIFY = 0xfff1;
 const NAME_PREFIX = 'JG_JMC';
-const EXTRA_SERVICES = [0x180a, 0x180f];           // harmless extras for the GATT map
+// "powerbox" mecanum car (came with its own remote, no app). Non-standard base: note the -0002-.
+const PB_SVC = '0000ffa0-0002-1000-8000-00805f9b34fb';
+const PB_WRITE = '0000ffa1-0002-1000-8000-00805f9b34fb', PB_NOTIFY = '0000ffa2-0002-1000-8000-00805f9b34fb';
+const PB_PREFIX = 'powerbox';
+const EXTRA_SERVICES = [0x180a, 0x180f, '0000ffa0-0000-1000-8000-00805f9b34fb'];   // extras for the GATT map
 
 function frame(type, payload){
   const f = [0x5a, 0x6b, type, 0x00, payload.length, ...payload];
@@ -124,13 +129,15 @@ const PROFILES = {
     },
     stopFrame(){ return frame(0x02, [0, 0, 0, 0, 1]); },
   },
-  // XC-7 gray omni car: protocol not captured yet. UI is ready; nothing is sent.
-  xc7: {
-    label: 'XC-7 car (not mapped yet)', motors: 4, todo: true,
+  // "powerbox" gray mecanum car: protocol not known yet (use the probe panel). Nothing is sent.
+  car: {
+    label: 'powerbox car (not mapped yet)', motors: 4, todo: true,
     build(){ return []; }, stopFrame(){ return null; },
   },
 };
-const STOP_REPEAT = 5;                              // the app sends the stop frame 5×
+const profileForName = n => n.startsWith(PB_PREFIX) ? 'car' : 'xc6';
+const STOP_REPEAT = 5;
+const PROPS = ['broadcast', 'read', 'writeWithoutResponse', 'write', 'notify', 'indicate', 'authenticatedSignedWrites', 'reliableWrite', 'writableAuxiliaries'];                              // the app sends the stop frame 5×
 
 /* ======================================================================
  * Utilities
@@ -149,8 +156,8 @@ const store = {
   set(k, v){ try { localStorage.setItem('lmc.' + k, JSON.stringify(v)); } catch {} },
 };
 const short = u => {
-  const m = /^0000([0-9a-f]{4})-0000-1000-8000-00805f9b34fb$/i.exec(u);
-  return m ? m[1] : u;
+  const m = /^0000([0-9a-f]{4})-000([0-9a-f])-1000-8000-00805f9b34fb$/i.exec(u);
+  return m ? (m[2] === '0' ? m[1] : `${m[1]}/${m[2]}`) : u;
 };
 const SIM = new URLSearchParams(location.search).has('sim');
 
@@ -193,9 +200,9 @@ class Motor {
     this.bt = bt; this.n = ++seq; this.server = null;
     this.chars = []; this.wr = null; this.busy = false; this.q = {stop: null, set: null}; this.idle = Promise.resolve();
     this.speeds = [0, 0, 0, 0];
-    this.cfg = Object.assign({profile: 'xc6', invert: [false, false, false, false], alias: '', max: 100},
+    this.cfg = Object.assign({profile: profileForName(this.btName), invert: [false, false, false, false], alias: '', max: 100},
                              store.get('dev.' + this.key, {}));
-    if (!PROFILES[this.cfg.profile]) this.cfg.profile = 'xc6';
+    if (!PROFILES[this.cfg.profile]) this.cfg.profile = profileForName(this.btName);
     bt.addEventListener('gattserverdisconnected', () => this.onDisconnect());
     this.buildCard();
   }
@@ -230,7 +237,7 @@ class Motor {
       if (!services.length) await sleep(700);
     }
     if (!services.length)
-      try { services = [await this.server.getPrimaryService(SVC)]; } catch {}
+      for (const u of [SVC, PB_SVC]) try { services.push(await this.server.getPrimaryService(u)); } catch {}
     if (!services.length) throw new Error('No Services found in device');
     this.chars = []; this.wr = null;
     const lines = [];
@@ -239,9 +246,11 @@ class Motor {
       let cs = [];
       try { cs = await s.getCharacteristics(); } catch {}
       for (const c of cs){
-        const props = Object.entries(c.properties).filter(([, v]) => v === true).map(([k]) => k);
+        const props = PROPS.filter(k => c.properties[k]);   // getters on the prototype: Object.entries() sees none
         lines.push(`  char ${short(c.uuid)} [${props.join(',')}]`);
         this.chars.push(c);
+        if (c.properties.read)
+          try { lines.push(`    value: ${hex(new Uint8Array((await c.readValue()).buffer))}`); } catch (e){ lines.push(`    (read failed: ${e.message})`); }
         if (c.properties.notify || c.properties.indicate){
           c.addEventListener('characteristicvaluechanged',
             e => this.onRx(c, new Uint8Array(e.target.value.buffer.slice(0))));
@@ -251,9 +260,9 @@ class Motor {
     }
     this.ui.gatt.textContent = lines.join('\n');
     lines.forEach(l => log(`${this.label}: ${l}`));
-    this.wr = this.chars.find(c => short(c.uuid) === CH_WRITE.toString(16))
+    this.wr = this.chars.find(c => short(c.uuid) === CH_WRITE.toString(16) || c.uuid === PB_WRITE)
            || this.chars.find(c => c.properties.write || c.properties.writeWithoutResponse) || null;
-    if (!this.wr) throw new Error('no writable characteristic (expected fff2)');
+    if (!this.wr) throw new Error('no writable characteristic (expected fff2 or ffa1)');
     log(`${this.label}: writing to ${short(this.wr.uuid)}`);
   }
 
@@ -351,6 +360,14 @@ class Motor {
         <pre class="gatt">(not connected)</pre>
         <div class="row"><input type="text" class="rawhex" placeholder="hex, e.g. 5a 6b 02 00 05 01 80 01 00 01 (sum added if missing)" style="flex:1;font-family:var(--mono)">
           <button class="b-raw">Send</button></div>
+        <div class="probe">
+          <div class="row"><b class="hint">Probe</b><span class="hint">sends each line, waits, moves on. Watch the hardware and press <kbd>R</kbd> when something happens.</span></div>
+          <textarea class="plist" rows="6" spellcheck="false" placeholder="one frame per line:  [label:] hex     # comment"></textarea>
+          <div class="row"><span class="hint">step</span><input type="number" class="pstep" value="1500" min="200" step="100" style="width:6em"><span class="hint">ms, then send</span>
+            <input type="text" class="pafter" placeholder="(optional) hex after each step" style="flex:1;font-family:var(--mono)"></div>
+          <div class="row"><button class="prun">Run</button><button class="pstop">Stop</button>
+            <button class="primary preact">It reacted! (R)</button><span class="big pnow"></span></div>
+        </div>
       </details>`;
     const q = s => card.querySelector(s);
     this.ui = { card, dot: q('.dot'), status: q('.status'), batt: q('.batt'), gatt: q('.gatt'), ctl: q('.ctl'), inv: q('.inv'), name: q('.name') };
@@ -372,10 +389,60 @@ class Motor {
       } catch (e){ log(`${this.label}: ${e.message}`, 'err'); }
     };
     q('.rawhex').onkeydown = e => { if (e.key === 'Enter') q('.b-raw').click(); };
+    this.ui.pnow = q('.pnow'); this.ui.plist = q('.plist');
+    q('.plist').value = this.cfg.probe || '';
+    q('.plist').onchange = e => { this.cfg.probe = e.target.value; this.save(); };
+    q('.prun').onclick = () => { if (!this.probing) this.probeRun(q('.plist').value, +q('.pstep').value || 1500, q('.pafter').value.trim()); };
+    q('.pstop').onclick = () => { this.probing = false; };
+    q('.preact').onclick = () => this.reacted();
     card.addEventListener('pointerdown', () => select(this));
     $('#devices').appendChild(card);
     $('#empty').style.display = 'none';
     this.buildControls();
+  }
+
+  /* ---------- probe: step through candidate frames while a human watches ---------- */
+  async probeRun(text, stepMs, afterHex){
+    const items = [];
+    text.split('\n').forEach((raw, i) => {
+      const l = raw.replace(/#.*/, '').trim(); if (!l) return;
+      const m = /^([^:]+):\s*(.*)$/.exec(l);
+      try { items.push({label: m ? m[1].trim() : `line ${i + 1}`, bytes: parseHex(m ? m[2] : l)}); }
+      catch (e){ log(`${this.label}: probe line ${i + 1}: ${e.message}`, 'err'); }
+    });
+    let after = null;
+    try { after = afterHex ? parseHex(afterHex) : null; } catch (e){ log(`after-hex: ${e.message}`, 'err'); return; }
+    this.probing = true; this.reactions = this.reactions || [];
+    log(`${this.label}: probe start, ${items.length} frames, ${stepMs} ms each`);
+    for (let i = 0; i < items.length && this.probing && this.connected; i++){
+      const it = items[i];
+      this.probeNow = `${i + 1}/${items.length} ${it.label}`;
+      this.ui.pnow.textContent = `${i + 1}/${items.length}`;
+      log(`${this.label} PROBE ${this.probeNow}`);
+      try { await this.rawWrite(it.bytes); } catch (e){ log(`${this.label}: ${e.message}`, 'err'); }
+      await sleep(stepMs);
+      await this.readBack();
+      if (after && this.connected) try { await this.rawWrite(after); } catch {}
+    }
+    log(`${this.label}: probe ${this.probing ? 'done' : 'stopped'}`);
+    this.ui.pnow.textContent += this.probing ? ' ✓' : ' ■';
+    this.probing = false; this.probeNow = null;
+  }
+  // Re-read every readable characteristic and log values that changed (a device may echo its state).
+  async readBack(){
+    this.lastRead = this.lastRead || {};
+    for (const c of this.chars.filter(c => c.properties.read)){
+      try {
+        const v = hex(new Uint8Array((await c.readValue()).buffer));
+        if (v !== this.lastRead[c.uuid]) log(`${this.label} READ ${short(c.uuid)}: ${v}`, 'rx');
+        this.lastRead[c.uuid] = v;
+      } catch {}
+    }
+  }
+  reacted(){
+    const what = this.probeNow || 'no probe running';
+    (this.reactions = this.reactions || []).push({t: performance.now(), what});
+    log(`*** ${this.label}: REACTED during ${what} ***`, 'err');
   }
 
   buildInvert(){
@@ -429,7 +496,7 @@ class Motor {
 
   buildCar(ctl){
     ctl.innerHTML = `
-      <div class="note">XC-7 commands are not captured yet; this joystick only shows the wheel mix. Nothing is sent.</div>
+      <div class="note">The car's commands are not known yet; this joystick only shows the wheel mix and sends nothing. Use Advanced → Probe to try candidate frames.</div>
       <div class="row" style="align-items:flex-start">
         <div class="joy"><div class="knob"></div></div>
         <pre class="gatt wheels" style="flex:1"></pre>
@@ -482,11 +549,11 @@ function select(d){
 async function addDevice(showAll){
   let bt;
   try {
-    const optionalServices = [SVC, ...EXTRA_SERVICES];
+    const optionalServices = [SVC, PB_SVC, ...EXTRA_SERVICES];
     bt = SIM ? simDevice()
       : await navigator.bluetooth.requestDevice(showAll
         ? { acceptAllDevices: true, optionalServices }
-        : { filters: [{namePrefix: NAME_PREFIX}, {services: [SVC]}], optionalServices });
+        : { filters: [{namePrefix: NAME_PREFIX}, {namePrefix: PB_PREFIX}, {services: [SVC]}], optionalServices });
   } catch (e){
     if (e.name !== 'NotFoundError') log(e.message, 'err');
     return;
@@ -551,6 +618,7 @@ addEventListener('keydown', e => {
   if (e.code === 'Space'){ e.preventDefault(); stopAll(); return; }
   const k = e.key.toLowerCase();
   if (/^[1-9]$/.test(k) && devices[+k - 1]){ select(devices[+k - 1]); return; }
+  if (k === 'r'){ (devices.find(d => d.probing) || selected)?.reacted(); e.preventDefault(); return; }
   if (k.length === 1 && 'wasdqe'.includes(k)){ if (!keys.has(k)){ keys.add(k); keyDrive(); } e.preventDefault(); return; }
   if ((k === 'arrowup' || k === 'arrowdown') && selected?.ui.nudge){
     selected.ui.nudge(k === 'arrowup' ? 10 : -10); e.preventDefault();
