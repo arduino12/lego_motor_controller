@@ -6,6 +6,8 @@ Browser controller for LEGO-compatible Bluetooth motors, several at once:
 - **"powerbox" mecanum car** (Power Box app, "M Serial"), gray brick chassis with 4 mecanum wheels
 
 One HTML file, nothing to install: the page talks to the devices directly through Web Bluetooth.
+
+**Live:** https://arduino12.github.io/lego_motor_controller/ (demo without hardware: [`?sim`](https://arduino12.github.io/lego_motor_controller/?sim))
 Both protocols were decoded from the vendor apps and checked on the real hardware. See [PROTOCOL.md](PROTOCOL.md).
 
 ## Use
