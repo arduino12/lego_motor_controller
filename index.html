@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LEGO Motor Controller</title>
+<style>
+:root{
+  --bg:#f6f7f9; --panel:#ffffff; --ink:#1b1f24; --mute:#5d6673; --line:#d9dde3;
+  --acc:#2563eb; --ok:#16a34a; --warn:#d97706; --bad:#dc2626; --track:#e7eaee;
+  --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1216; --panel:#171b21; --ink:#e6e9ee; --mute:#9aa4b2; --line:#2a3039;
+    --acc:#60a5fa; --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; --track:#232933;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1216; --panel:#171b21; --ink:#e6e9ee; --mute:#9aa4b2; --line:#2a3039;
+  --acc:#60a5fa; --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; --track:#232933;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,Segoe UI,Roboto,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:5}
+header h1{font-size:17px;margin:0 12px 0 0}
+button,select,input[type=text]{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
+button{cursor:pointer}
+button:hover{border-color:var(--acc)}
+button.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+button.stop{background:var(--bad);border-color:var(--bad);color:#fff;font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+.spacer{flex:1}
+.hint{color:var(--mute);font-size:12px}
+main{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,420px);gap:16px;padding:16px}
+@media (max-width:900px){main{grid-template-columns:minmax(0,1fr)}}
+#devices{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;align-content:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.card.selected{outline:2px solid var(--acc)}
+.card .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card .name{font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--mute);flex:none}
+.dot.on{background:var(--ok)} .dot.busy{background:var(--warn)} .dot.off{background:var(--bad)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.motor{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center}
+.motor input[type=range]{width:100%}
+.val{font-family:var(--mono);min-width:4ch;text-align:right}
+.joy{width:180px;height:180px;border-radius:50%;background:var(--track);position:relative;touch-action:none;flex:none;border:1px solid var(--line)}
+.joy .knob{width:56px;height:56px;border-radius:50%;background:var(--acc);position:absolute;left:62px;top:62px;pointer-events:none;opacity:.9}
+.wheels{display:grid;grid-template-columns:1fr 1fr;gap:6px;flex:1;min-width:140px}
+.wheel{border:1px solid var(--line);border-radius:6px;padding:4px 6px;font-size:12px}
+.bar{height:6px;background:var(--track);border-radius:3px;position:relative;margin-top:3px}
+.bar i{position:absolute;top:0;bottom:0;background:var(--acc);border-radius:3px}
+details{border-top:1px solid var(--line);padding-top:8px}
+summary{cursor:pointer;color:var(--mute)}
+pre.gatt{font:12px var(--mono);white-space:pre-wrap;margin:6px 0;max-height:220px;overflow:auto}
+#logpanel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;min-height:300px;max-height:calc(100vh - 100px);position:sticky;top:76px}
+#log{font:12px/1.35 var(--mono);white-space:pre-wrap;word-break:break-all;overflow:auto;flex:1;margin:0;min-height:200px}
+#log .tx{color:var(--acc)} #log .rx{color:var(--ok)} #log .err{color:var(--bad)} #log .info{color:var(--mute)}
+#empty{color:var(--mute);padding:24px;border:1px dashed var(--line);border-radius:10px;text-align:center}
+#nosupport{display:none;background:var(--bad);color:#fff;padding:10px 16px}
+kbd{font:12px var(--mono);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+</style>
+</head>
+<body>
+<div id="nosupport">This browser has no Web Bluetooth. Use desktop Chrome or Edge (or Chrome on Android).</div>
+<header>
+  <h1>LEGO Motor Controller</h1>
+  <button class="primary" id="btnAdd" title="Pick a motor from the Bluetooth chooser">+ Add motor</button>
+  <button id="btnAddAll" title="Show every nearby BLE device, for motors that don't advertise their service">+ Add (show all)</button>
+  <span class="spacer"></span>
+  <span class="hint"><kbd>Space</kbd> stop all · <kbd>W A S D</kbd> drive · <kbd>Q E</kbd> rotate · <kbd>←</kbd><kbd>→</kbd> single motor</span>
+  <button class="stop" id="btnStopAll">STOP ALL</button>
+</header>
+<main>
+  <section id="devices"><div id="empty">No motors yet. Switch a motor on, then press <b>+ Add motor</b>. Repeat for each motor.</div></section>
+  <aside id="logpanel">
+    <div class="row"><b style="flex:1">Log</b>
+      <label class="hint"><input type="checkbox" id="logTx" checked> TX</label>
+      <label class="hint"><input type="checkbox" id="logRx" checked> RX</label>
+      <button id="btnLogSave">Save</button><button id="btnLogClear">Clear</button></div>
+    <pre id="log"></pre>
+  </aside>
+</main>
+<script>
+'use strict';
+/* ======================================================================
+ * Protocol layer. Everything device-specific lives here.
+ * Filled in from the decompiled 积木Program / XP Block app (see PROTOCOL.md).
+ * ==================================================================== */
+const CANDIDATE_SERVICES = [
+  0xffe0, 0xfff0, 0xff00, 0xffb0, 0xae00, 0xae30, 0xfee7, 0x180a, 0x180f,
+  '6e400001-b5a3-f393-e0a9-e50e24dcca9e',          // Nordic UART
+  '00001623-1212-efde-1623-785feabcd123',          // LEGO Wireless Protocol hub
+];
+const NAME_PREFIXES = [];                           // filled from the APK
+
+const PROTO = {
+  // Frames to set one motor. port: 0..3, speed: -100..100. Returns Uint8Array.
+  motor(port, speed){ return null; },
+  // Frames to set several motors at once (speeds[]: -100..100). Return null to fall back to motor().
+  motors(speeds){ return null; },
+  stop(){ return null; },
+};
+
+/* ======================================================================
+ * Utilities
+ * ==================================================================== */
+const $ = s => document.querySelector(s);
+const hex = u8 => [...u8].map(b => b.toString(16).padStart(2,'0')).join(' ');
+const parseHex = s => {
+  const t = s.replace(/0x/gi,'').replace(/[^0-9a-f]/gi,'');
+  if (t.length % 2) throw new Error('odd number of hex digits');
+  return Uint8Array.from(t.match(/../g) || [], h => parseInt(h,16));
+};
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const store = {
+  get(k, d){ try { const v = localStorage.getItem('lmc.'+k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v){ try { localStorage.setItem('lmc.'+k, JSON.stringify(v)); } catch {} },
+};
+const short = u => {
+  const m = /^0000([0-9a-f]{4})-0000-1000-8000-00805f9b34fb$/i.exec(u);
+  return m ? m[1] : u;
+};
+
+/* ======================================================================
+ * Log
+ * ==================================================================== */
+const logEl = $('#log'), logLines = [];
+const t0 = performance.now();
+function log(msg, cls='info'){
+  if (cls === 'tx' && !$('#logTx').checked) return;
+  if (cls === 'rx' && !$('#logRx').checked) return;
+  const t = ((performance.now() - t0)/1000).toFixed(3).padStart(8);
+  const line = `${t} ${msg}`;
+  logLines.push(line);
+  const span = document.createElement('span');
+  span.className = cls; span.textContent = line + '\n';
+  const stick = logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 4;
+  logEl.appendChild(span);
+  while (logEl.childNodes.length > 1500) logEl.firstChild.remove();
+  if (stick) logEl.scrollTop = logEl.scrollHeight;
+}
+$('#btnLogClear').onclick = () => { logEl.textContent = ''; logLines.length = 0; };
+$('#btnLogSave').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([logLines.join('\n')], {type:'text/plain'}));
+  a.download = `lego-motor-log-${new Date().toISOString().replace(/[:.]/g,'-')}.txt`;
+  a.click(); URL.revokeObjectURL(a.href);
+};
+
+/* ======================================================================
+ * Device
+ * ==================================================================== */
+const devices = [];
+let selected = null;
+let seq = 0;
+
+class Motorbox {
+  constructor(bt){
+    this.bt = bt; this.n = ++seq; this.server = null;
+    this.chars = []; this.wr = null; this.busy = false; this.pending = null;
+    this.speeds = [0,0,0,0];
+    this.cfg = Object.assign({profile:'single', invert:[false,false,false,false], writeChar:null, repeatMs:0},
+                             store.get('dev.'+this.key, {}));
+    bt.addEventListener('gattserverdisconnected', () => this.onDisconnect());
+    this.buildCard();
+  }
+  get key(){ return this.bt.name || this.bt.id; }
+  get label(){ return `#${this.n} ${this.bt.name || '(no name)'}`; }
+  save(){ store.set('dev.'+this.key, this.cfg); }
+  state(s, txt){ this.ui.dot.className = 'dot ' + s; this.ui.status.textContent = txt; }
+
+  async connect(){
+    this.state('busy','connecting…');
+    try {
+      this.server = await this.bt.gatt.connect();
+      await this.discover();
+      this.state('on','connected');
+      log(`${this.label}: connected`);
+    } catch (e){
+      this.state('off','failed'); log(`${this.label}: ${e.message}`, 'err');
+      if (/No Services/i.test(e.message))
+        log('Windows: pair the motor in Settings → Bluetooth first, then press Retry.', 'err');
+    }
+  }
+
+  async discover(){
+    let services = [];
+    for (let i = 0; i < 4 && !services.length; i++){
+      try { services = await this.server.getPrimaryServices(); } catch {}
+      if (!services.length) await sleep(700);
+    }
+    if (!services.length)
+      for (const u of CANDIDATE_SERVICES)
+        try { services.push(await this.server.getPrimaryService(u)); } catch {}
+    if (!services.length) throw new Error('No Services found in device');
+    this.chars = [];
+    const lines = [];
+    for (const s of services){
+      lines.push(`service ${short(s.uuid)}`);
+      let cs = [];
+      try { cs = await s.getCharacteristics(); } catch {}
+      for (const c of cs){
+        const props = Object.entries(c.properties).filter(([,v]) => v === true).map(([k]) => k);
+        lines.push(`  char ${short(c.uuid)} [${props.join(',')}]`);
+        this.chars.push(c);
+        if (c.properties.notify || c.properties.indicate){
+          c.addEventListener('characteristicvaluechanged',
+            e => this.onRx(c, new Uint8Array(e.target.value.buffer)));
+          try { await c.startNotifications(); } catch (e){ lines.push(`    (notify failed: ${e.message})`); }
+        }
+      }
+    }
+    this.ui.gatt.textContent = lines.join('\n');
+    lines.forEach(l => log(`${this.label}: ${l}`));
+    this.fillWriteSelect();
+  }
+
+  fillWriteSelect(){
+    const sel = this.ui.wsel; sel.textContent = '';
+    const writable = this.chars.filter(c => c.properties.write || c.properties.writeWithoutResponse);
+    for (const c of writable){
+      const o = document.createElement('option');
+      o.value = c.uuid; o.textContent = `${short(c.service.uuid)} / ${short(c.uuid)}`;
+      sel.appendChild(o);
+    }
+    const want = writable.find(c => c.uuid === this.cfg.writeChar) || writable[0] || null;
+    this.wr = want; if (want) sel.value = want.uuid;
+  }
+
+  onRx(c, u8){ log(`${this.label} RX ${short(c.uuid)}: ${hex(u8)}`, 'rx'); }
+
+  async rawWrite(u8){
+    if (!this.wr) throw new Error('no writable characteristic');
+    log(`${this.label} TX ${short(this.wr.uuid)}: ${hex(u8)}`, 'tx');
+    if (this.wr.properties.writeWithoutResponse) await this.wr.writeValueWithoutResponse(u8);
+    else await this.wr.writeValue(u8);
+  }
+
+  // Coalescing sender: while a write is in flight, keep only the newest frame(s).
+  send(frames){
+    if (!frames) return;
+    if (!Array.isArray(frames)) frames = [frames];
+    frames = frames.filter(Boolean);
+    if (!frames.length) return;
+    if (this.busy){ this.pending = frames; return; }
+    this.busy = true;
+    (async () => {
+      let f = frames;
+      while (f){
+        for (const fr of f){
+          try { await this.rawWrite(fr); } catch (e){ log(`${this.label}: write failed: ${e.message}`, 'err'); }
+        }
+        f = this.pending; this.pending = null;
+      }
+      this.busy = false;
+    })();
+  }
+
+  setSpeeds(sp){
+    this.speeds = sp.map((v,i) => Math.round(clamp(v,-100,100) * (this.cfg.invert[i] ? -1 : 1)));
+    this.renderWheels();
+    if (!this.server?.connected) return;
+    const multi = PROTO.motors(this.speeds);
+    if (multi) this.send(multi);
+    else this.send(this.speeds.slice(0, this.cfg.profile === 'car' ? 4 : 1).map((v,i) => PROTO.motor(i, v)));
+  }
+
+  stop(){
+    this.ui.setNeutral?.();
+    this.setSpeeds([0,0,0,0]);
+    const s = PROTO.stop(); if (s && this.server?.connected) this.send(s);
+  }
+
+  async disconnect(){
+    this.stop(); await sleep(150);
+    try { this.bt.gatt.disconnect(); } catch {}
+  }
+
+  onDisconnect(){ this.state('off','disconnected'); log(`${this.label}: disconnected`); }
+
+  remove(){
+    this.disconnect();
+    devices.splice(devices.indexOf(this), 1);
+    this.ui.card.remove();
+    if (selected === this) select(devices[0] || null);
+    if (!devices.length) $('#empty').style.display = '';
+  }
+
+  /* ---------- UI ---------- */
+  buildCard(){
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="top"><span class="dot"></span><span class="name"></span>
+        <span class="hint status"></span></div>
+      <div class="row">
+        <select class="profile">
+          <option value="single">Single motor</option>
+          <option value="car">Omni car (4 motors)</option>
+        </select>
+        <button class="b-stop">Stop</button>
+        <button class="b-retry">Retry</button>
+        <button class="b-disc">Disconnect</button>
+        <button class="b-rm" title="Remove from page">✕</button>
+      </div>
+      <div class="ctl"></div>
+      <details><summary>Advanced: GATT, raw hex, polarity</summary>
+        <pre class="gatt">(not connected)</pre>
+        <div class="row"><span class="hint">write to</span><select class="wsel"></select></div>
+        <div class="row"><input type="text" class="rawhex" placeholder="hex bytes, e.g. 5a 01 64 a5" style="flex:1;font-family:var(--mono)">
+          <button class="b-raw">Send</button></div>
+        <div class="row inv"></div>
+      </details>`;
+    const q = s => card.querySelector(s);
+    this.ui = { card, dot:q('.dot'), status:q('.status'), gatt:q('.gatt'), wsel:q('.wsel'), ctl:q('.ctl'), inv:q('.inv') };
+    q('.name').textContent = this.label;
+    q('.profile').value = this.cfg.profile;
+    q('.profile').onchange = e => { this.cfg.profile = e.target.value; this.save(); this.stop(); this.buildControls(); };
+    q('.b-stop').onclick = () => this.stop();
+    q('.b-retry').onclick = () => this.connect();
+    q('.b-disc').onclick = () => this.disconnect();
+    q('.b-rm').onclick = () => this.remove();
+    this.ui.wsel.onchange = e => {
+      this.wr = this.chars.find(c => c.uuid === e.target.value) || null;
+      this.cfg.writeChar = e.target.value; this.save();
+    };
+    q('.b-raw').onclick = async () => {
+      try { await this.rawWrite(parseHex(q('.rawhex').value)); }
+      catch (e){ log(`${this.label}: ${e.message}`, 'err'); }
+    };
+    q('.rawhex').onkeydown = e => { if (e.key === 'Enter') q('.b-raw').click(); };
+    card.addEventListener('pointerdown', () => select(this));
+    $('#devices').appendChild(card);
+    $('#empty').style.display = 'none';
+    this.buildControls();
+  }
+
+  buildInvert(){
+    const n = this.cfg.profile === 'car' ? 4 : 1;
+    const names = n === 4 ? ['FL','FR','RL','RR'] : ['motor'];
+    this.ui.inv.innerHTML = '<span class="hint">invert</span>';
+    for (let i = 0; i < n; i++){
+      const l = document.createElement('label'); l.className = 'hint';
+      l.innerHTML = `<input type="checkbox"> ${names[i]}`;
+      const cb = l.querySelector('input'); cb.checked = this.cfg.invert[i];
+      cb.onchange = () => { this.cfg.invert[i] = cb.checked; this.save(); };
+      this.ui.inv.appendChild(l);
+    }
+  }
+
+  buildControls(){
+    this.buildInvert();
+    const ctl = this.ui.ctl; ctl.textContent = '';
+    this.wheelBars = [];
+    if (this.cfg.profile === 'single'){
+      ctl.innerHTML = `
+        <div class="motor"><button class="m-rev">◀</button>
+          <input type="range" min="-100" max="100" value="0" step="1">
+          <button class="m-fwd">▶</button></div>
+        <div class="row"><span class="hint">speed</span><span class="val">0</span>
+          <span class="spacer"></span><label class="hint"><input type="checkbox" class="spring" checked> spring back to 0</label></div>`;
+      const r = ctl.querySelector('input[type=range]'), v = ctl.querySelector('.val');
+      const spring = ctl.querySelector('.spring');
+      const apply = () => { v.textContent = r.value; this.setSpeeds([+r.value,0,0,0]); };
+      r.oninput = apply;
+      r.onpointerup = () => { if (spring.checked){ r.value = 0; apply(); } };
+      const hold = (btn, val) => {
+        btn.onpointerdown = () => { r.value = val; apply(); };
+        btn.onpointerup = btn.onpointerleave = () => { if (+r.value === val){ r.value = 0; apply(); } };
+      };
+      hold(ctl.querySelector('.m-rev'), -100); hold(ctl.querySelector('.m-fwd'), 100);
+      this.ui.setNeutral = () => { r.value = 0; v.textContent = '0'; };
+      this.ui.nudge = d => { r.value = clamp(+r.value + d, -100, 100); apply(); };
+    } else {
+      ctl.innerHTML = `
+        <div class="row" style="align-items:flex-start">
+          <div class="joy"><div class="knob"></div></div>
+          <div class="wheels"></div>
+        </div>
+        <div class="motor"><span class="hint">rotate</span>
+          <input type="range" class="rot" min="-100" max="100" value="0"><span class="val rv">0</span></div>
+        <div class="motor"><span class="hint">max</span>
+          <input type="range" class="max" min="10" max="100" value="${this.cfg.max ?? 100}"><span class="val mv">${this.cfg.max ?? 100}</span></div>`;
+      const wheels = ctl.querySelector('.wheels');
+      for (const nm of ['FL','FR','RL','RR']){
+        const w = document.createElement('div'); w.className = 'wheel';
+        w.innerHTML = `${nm} <span class="val">0</span><div class="bar"><i></i></div>`;
+        wheels.appendChild(w); this.wheelBars.push(w);
+      }
+      const joy = ctl.querySelector('.joy'), knob = ctl.querySelector('.knob');
+      const rot = ctl.querySelector('.rot'), rv = ctl.querySelector('.rv');
+      const mx = ctl.querySelector('.max'), mv = ctl.querySelector('.mv');
+      this.drive = {x:0, y:0, w:0};
+      const R = 90, K = 28;
+      const placeKnob = () => {
+        knob.style.left = (R - K + this.drive.x * (R - K)) + 'px';
+        knob.style.top  = (R - K - this.drive.y * (R - K)) + 'px';
+      };
+      const mix = () => {
+        const {x, y, w} = this.drive, m = (+mx.value) / 100;
+        // X-configured omni / mecanum: FL, FR, RL, RR
+        let s = [y + x + w, y - x - w, y - x + w, y + x - w];
+        const peak = Math.max(1, ...s.map(Math.abs));
+        s = s.map(v => v / peak * 100 * m);
+        this.setSpeeds(s);
+        placeKnob();
+      };
+      const fromEvent = e => {
+        const b = joy.getBoundingClientRect();
+        let x = (e.clientX - b.left - R) / (R - K), y = -(e.clientY - b.top - R) / (R - K);
+        const d = Math.hypot(x, y); if (d > 1){ x /= d; y /= d; }
+        this.drive.x = x; this.drive.y = y; mix();
+      };
+      joy.onpointerdown = e => { joy.setPointerCapture(e.pointerId); fromEvent(e); };
+      joy.onpointermove = e => { if (joy.hasPointerCapture(e.pointerId)) fromEvent(e); };
+      joy.onpointerup = joy.onpointercancel = () => { this.drive.x = this.drive.y = 0; mix(); };
+      rot.oninput = () => { this.drive.w = +rot.value / 100; rv.textContent = rot.value; mix(); };
+      rot.onpointerup = () => { rot.value = 0; rv.textContent = '0'; this.drive.w = 0; mix(); };
+      mx.oninput = () => { mv.textContent = mx.value; this.cfg.max = +mx.value; this.save(); mix(); };
+      this.ui.setNeutral = () => { this.drive = {x:0,y:0,w:0}; rot.value = 0; rv.textContent = '0'; placeKnob(); };
+      this.ui.drive = (x, y, w) => { this.drive = {x, y, w}; mix(); };
+    }
+    this.renderWheels();
+  }
+
+  renderWheels(){
+    this.wheelBars?.forEach((w, i) => {
+      const v = this.speeds[i] || 0;
+      w.querySelector('.val').textContent = v;
+      const bar = w.querySelector('i');
+      bar.style.left = (v < 0 ? 50 + v/2 : 50) + '%';
+      bar.style.width = Math.abs(v/2) + '%';
+    });
+  }
+}
+
+function select(d){
+  selected = d;
+  devices.forEach(x => x.ui.card.classList.toggle('selected', x === d));
+}
+
+/* ======================================================================
+ * Connect
+ * ==================================================================== */
+async function addDevice(showAll){
+  let bt;
+  try {
+    const filters = [...NAME_PREFIXES.map(p => ({namePrefix: p})),
+                     ...CANDIDATE_SERVICES.filter(u => typeof u === 'number' && u >= 0xff00).map(u => ({services:[u]}))];
+    bt = await navigator.bluetooth.requestDevice(showAll || !filters.length
+      ? { acceptAllDevices: true, optionalServices: CANDIDATE_SERVICES }
+      : { filters, optionalServices: CANDIDATE_SERVICES });
+  } catch (e){
+    if (e.name !== 'NotFoundError') log(e.message, 'err');
+    return;
+  }
+  const existing = devices.find(d => d.bt.id === bt.id);
+  if (existing){ select(existing); if (!existing.server?.connected) existing.connect(); return; }
+  const d = new Motorbox(bt); devices.push(d); select(d);
+  await d.connect();
+}
+
+function stopAll(){ devices.forEach(d => d.stop()); log('STOP ALL'); }
+
+/* ======================================================================
+ * Keyboard + safety
+ * ==================================================================== */
+const keys = new Set();
+function keyDrive(){
+  const d = selected; if (!d) return;
+  if (d.cfg.profile === 'car' && d.ui.drive){
+    const x = (keys.has('d') ? 1 : 0) - (keys.has('a') ? 1 : 0);
+    const y = (keys.has('w') ? 1 : 0) - (keys.has('s') ? 1 : 0);
+    const w = (keys.has('e') ? 1 : 0) - (keys.has('q') ? 1 : 0);
+    d.ui.drive(x, y, w * 0.6);
+  }
+}
+addEventListener('keydown', e => {
+  if (e.target.matches('input[type=text],select')) return;
+  if (e.code === 'Space'){ e.preventDefault(); stopAll(); return; }
+  const k = e.key.toLowerCase();
+  if ('wasdqe'.includes(k) && k.length === 1){ if (!keys.has(k)){ keys.add(k); keyDrive(); } e.preventDefault(); }
+  if ((k === 'arrowleft' || k === 'arrowright') && selected?.ui.nudge){
+    selected.ui.nudge(k === 'arrowright' ? 10 : -10); e.preventDefault();
+  }
+});
+addEventListener('keyup', e => { const k = e.key.toLowerCase(); if (keys.delete(k)) keyDrive(); });
+addEventListener('blur', () => { keys.clear(); stopAll(); });   // dead-man's switch
+addEventListener('beforeunload', () => devices.forEach(d => d.stop()));
+
+$('#btnAdd').onclick = () => addDevice(false);
+$('#btnAddAll').onclick = () => addDevice(true);
+$('#btnStopAll').onclick = stopAll;
+if (!navigator.bluetooth){
+  $('#nosupport').style.display = 'block';
+  $('#btnAdd').disabled = $('#btnAddAll').disabled = true;
+}
+log('ready. Web Bluetooth ' + (navigator.bluetooth ? 'available' : 'NOT available'));
+</script>
+</body>
+</html>
