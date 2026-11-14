@@ -25,7 +25,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,Sego
 header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:5}
 header h1{font-size:17px;margin:0 12px 0 0}
 button,select,input[type=text]{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
-button{cursor:pointer}
+button{cursor:pointer;user-select:none;touch-action:manipulation}
 button:hover{border-color:var(--acc)}
 button.primary{background:var(--acc);border-color:var(--acc);color:#fff}
 button.stop{background:var(--bad);border-color:var(--bad);color:#fff;font-weight:600}
@@ -34,7 +34,7 @@ button:disabled{opacity:.5;cursor:default}
 .hint{color:var(--mute);font-size:12px}
 main{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,420px);gap:16px;padding:16px}
 @media (max-width:900px){main{grid-template-columns:minmax(0,1fr)}}
-#devices{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;align-content:start}
+#devices{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;align-content:start}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px}
 .card.selected{outline:2px solid var(--acc)}
 .card .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -44,40 +44,42 @@ main{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,420px);gap:16
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .motor{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center}
 .motor input[type=range]{width:100%}
+.big{font:600 28px var(--mono);min-width:5ch;text-align:center}
 .val{font-family:var(--mono);min-width:4ch;text-align:right}
+.steps{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.steps button{padding:10px;font-size:18px}
 .joy{width:180px;height:180px;border-radius:50%;background:var(--track);position:relative;touch-action:none;flex:none;border:1px solid var(--line)}
 .joy .knob{width:56px;height:56px;border-radius:50%;background:var(--acc);position:absolute;left:62px;top:62px;pointer-events:none;opacity:.9}
-.wheels{display:grid;grid-template-columns:1fr 1fr;gap:6px;flex:1;min-width:140px}
-.wheel{border:1px solid var(--line);border-radius:6px;padding:4px 6px;font-size:12px}
-.bar{height:6px;background:var(--track);border-radius:3px;position:relative;margin-top:3px}
-.bar i{position:absolute;top:0;bottom:0;background:var(--acc);border-radius:3px}
+.note{background:var(--track);border-radius:6px;padding:8px;font-size:12px;color:var(--mute)}
 details{border-top:1px solid var(--line);padding-top:8px}
 summary{cursor:pointer;color:var(--mute)}
 pre.gatt{font:12px var(--mono);white-space:pre-wrap;margin:6px 0;max-height:220px;overflow:auto}
 #logpanel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;min-height:300px;max-height:calc(100vh - 100px);position:sticky;top:76px}
-#log{font:12px/1.35 var(--mono);white-space:pre-wrap;word-break:break-all;overflow:auto;flex:1;margin:0;min-height:200px}
+#log{font:12px/1.35 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;overflow:auto;flex:1;margin:0;min-height:200px}
 #log .tx{color:var(--acc)} #log .rx{color:var(--ok)} #log .err{color:var(--bad)} #log .info{color:var(--mute)}
 #empty{color:var(--mute);padding:24px;border:1px dashed var(--line);border-radius:10px;text-align:center}
 #nosupport{display:none;background:var(--bad);color:#fff;padding:10px 16px}
+#simbar{display:none;background:var(--warn);color:#000;padding:6px 16px;font-size:13px}
 kbd{font:12px var(--mono);border:1px solid var(--line);border-radius:4px;padding:0 4px}
 </style>
 </head>
 <body>
 <div id="nosupport">This browser has no Web Bluetooth. Use desktop Chrome or Edge (or Chrome on Android).</div>
+<div id="simbar">Simulation mode (<code>?sim</code>): motors are fake, nothing is sent over Bluetooth.</div>
 <header>
   <h1>LEGO Motor Controller</h1>
-  <button class="primary" id="btnAdd" title="Pick a motor from the Bluetooth chooser">+ Add motor</button>
-  <button id="btnAddAll" title="Show every nearby BLE device, for motors that don't advertise their service">+ Add (show all)</button>
+  <button class="primary" id="btnAdd" title="Pick a motor (JG_JMC-…) from the Bluetooth chooser">+ Add motor</button>
+  <button id="btnAddAll" title="Show every nearby BLE device">+ Add (show all)</button>
   <span class="spacer"></span>
-  <span class="hint"><kbd>Space</kbd> stop all · <kbd>W A S D</kbd> drive · <kbd>Q E</kbd> rotate · <kbd>←</kbd><kbd>→</kbd> single motor</span>
+  <span class="hint"><kbd>Space</kbd> stop all · <kbd>1</kbd>–<kbd>9</kbd> select · <kbd>↑</kbd><kbd>↓</kbd> speed ±10 · <kbd>W A S D</kbd><kbd>Q E</kbd> car</span>
   <button class="stop" id="btnStopAll">STOP ALL</button>
 </header>
 <main>
-  <section id="devices"><div id="empty">No motors yet. Switch a motor on, then press <b>+ Add motor</b>. Repeat for each motor.</div></section>
+  <section id="devices"><div id="empty">No motors yet. Switch a motor on (close the phone app so it lets go), then press <b>+ Add motor</b> and pick <b>JG_JMC-…</b>. Repeat for each motor.</div></section>
   <aside id="logpanel">
     <div class="row"><b style="flex:1">Log</b>
       <label class="hint"><input type="checkbox" id="logTx" checked> TX</label>
-      <label class="hint"><input type="checkbox" id="logRx" checked> RX</label>
+      <label class="hint"><input type="checkbox" id="logRx"> RX</label>
       <button id="btnLogSave">Save</button><button id="btnLogClear">Clear</button></div>
     <pre id="log"></pre>
   </aside>
@@ -85,56 +87,85 @@ kbd{font:12px var(--mono);border:1px solid var(--line);border-radius:4px;padding
 <script>
 'use strict';
 /* ======================================================================
- * Protocol layer. Everything device-specific lives here.
- * Filled in from the decompiled 积木Program / XP Block app (see PROTOCOL.md).
+ * Protocol (decoded from 积木Program / XP Block v3.1.0 + HCI capture, see PROTOCOL.md)
+ *   GATT service fff0, write fff2 (write-with-response), notify fff1.
+ *   Frame:  5a 6b <type> 00 <len> <payload…> <sum>
+ *           type 02 = command (phone→motor), 01 = status (motor→phone)
+ *           sum  = (sum of every preceding byte) & 0xff
  * ==================================================================== */
-const CANDIDATE_SERVICES = [
-  0xffe0, 0xfff0, 0xff00, 0xffb0, 0xae00, 0xae30, 0xfee7, 0x180a, 0x180f,
-  '6e400001-b5a3-f393-e0a9-e50e24dcca9e',          // Nordic UART
-  '00001623-1212-efde-1623-785feabcd123',          // LEGO Wireless Protocol hub
-];
-const NAME_PREFIXES = [];                           // filled from the APK
+const SVC = 0xfff0, CH_WRITE = 0xfff2, CH_NOTIFY = 0xfff1;
+const NAME_PREFIX = 'JG_JMC';
+const EXTRA_SERVICES = [0x180a, 0x180f];           // harmless extras for the GATT map
 
-const PROTO = {
-  // Frames to set one motor. port: 0..3, speed: -100..100. Returns Uint8Array.
-  motor(port, speed){ return null; },
-  // Frames to set several motors at once (speeds[]: -100..100). Return null to fall back to motor().
-  motors(speeds){ return null; },
-  stop(){ return null; },
+function frame(type, payload){
+  const f = [0x5a, 0x6b, type, 0x00, payload.length, ...payload];
+  f.push(f.reduce((a, b) => a + b, 0) & 0xff);
+  return Uint8Array.from(f);
+}
+function parseFrame(u8){
+  if (u8.length < 6 || u8[0] !== 0x5a || u8[1] !== 0x6b) return null;
+  const len = u8[4];
+  if (u8.length < 6 + len) return null;
+  const sum = u8.slice(0, 5 + len).reduce((a, b) => a + b, 0) & 0xff;
+  return { type: u8[2], payload: u8.slice(5, 5 + len), ok: sum === u8[5 + len] };
+}
+
+const PROFILES = {
+  // XC-6 "POWERPACK" single motor. payload = [dir, speed, dir, 00, 01]
+  //   dir 01 = forward ("+"), 02 = reverse ("−"), 00 = stop; speed 0..255.
+  //   Bytes 3..5 are copied verbatim from the app; their meaning is not known.
+  xc6: {
+    label: 'XC-6 motor', motors: 1,
+    build(speeds){
+      const s = speeds[0];
+      const dir = s > 0 ? 1 : s < 0 ? 2 : 0;
+      const spd = dir ? Math.floor(Math.abs(s) * 255 / 100) : 0;   // the app truncates: 10 % = 0x19
+      return [frame(0x02, [dir, spd, dir, 0x00, 0x01])];
+    },
+    stopFrame(){ return frame(0x02, [0, 0, 0, 0, 1]); },
+  },
+  // XC-7 gray omni car: protocol not captured yet. UI is ready; nothing is sent.
+  xc7: {
+    label: 'XC-7 car (not mapped yet)', motors: 4, todo: true,
+    build(){ return []; }, stopFrame(){ return null; },
+  },
 };
+const STOP_REPEAT = 5;                              // the app sends the stop frame 5×
 
 /* ======================================================================
  * Utilities
  * ==================================================================== */
 const $ = s => document.querySelector(s);
-const hex = u8 => [...u8].map(b => b.toString(16).padStart(2,'0')).join(' ');
+const hex = u8 => [...u8].map(b => b.toString(16).padStart(2, '0')).join(' ');
 const parseHex = s => {
-  const t = s.replace(/0x/gi,'').replace(/[^0-9a-f]/gi,'');
+  const t = s.replace(/0x/gi, '').replace(/[^0-9a-f]/gi, '');
   if (t.length % 2) throw new Error('odd number of hex digits');
-  return Uint8Array.from(t.match(/../g) || [], h => parseInt(h,16));
+  return Uint8Array.from(t.match(/../g) || [], h => parseInt(h, 16));
 };
-const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const store = {
-  get(k, d){ try { const v = localStorage.getItem('lmc.'+k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-  set(k, v){ try { localStorage.setItem('lmc.'+k, JSON.stringify(v)); } catch {} },
+  get(k, d){ try { const v = localStorage.getItem('lmc.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v){ try { localStorage.setItem('lmc.' + k, JSON.stringify(v)); } catch {} },
 };
 const short = u => {
   const m = /^0000([0-9a-f]{4})-0000-1000-8000-00805f9b34fb$/i.exec(u);
   return m ? m[1] : u;
 };
+const SIM = new URLSearchParams(location.search).has('sim');
 
 /* ======================================================================
  * Log
  * ==================================================================== */
 const logEl = $('#log'), logLines = [];
 const t0 = performance.now();
-function log(msg, cls='info'){
-  if (cls === 'tx' && !$('#logTx').checked) return;
-  if (cls === 'rx' && !$('#logRx').checked) return;
-  const t = ((performance.now() - t0)/1000).toFixed(3).padStart(8);
+function log(msg, cls = 'info'){
+  const t = ((performance.now() - t0) / 1000).toFixed(3).padStart(8);
   const line = `${t} ${msg}`;
   logLines.push(line);
+  if (logLines.length > 20000) logLines.splice(0, 5000);
+  if (cls === 'tx' && !$('#logTx').checked) return;
+  if (cls === 'rx' && !$('#logRx').checked) return;
   const span = document.createElement('span');
   span.className = cls; span.textContent = line + '\n';
   const stick = logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 4;
@@ -145,9 +176,9 @@ function log(msg, cls='info'){
 $('#btnLogClear').onclick = () => { logEl.textContent = ''; logLines.length = 0; };
 $('#btnLogSave').onclick = () => {
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([logLines.join('\n')], {type:'text/plain'}));
-  a.download = `lego-motor-log-${new Date().toISOString().replace(/[:.]/g,'-')}.txt`;
-  a.click(); URL.revokeObjectURL(a.href);
+  a.href = URL.createObjectURL(new Blob([logLines.join('\n')], {type: 'text/plain'}));
+  a.download = `lego-motor-log-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
 
 /* ======================================================================
@@ -157,32 +188,38 @@ const devices = [];
 let selected = null;
 let seq = 0;
 
-class Motorbox {
+class Motor {
   constructor(bt){
     this.bt = bt; this.n = ++seq; this.server = null;
-    this.chars = []; this.wr = null; this.busy = false; this.pending = null;
-    this.speeds = [0,0,0,0];
-    this.cfg = Object.assign({profile:'single', invert:[false,false,false,false], writeChar:null, repeatMs:0},
-                             store.get('dev.'+this.key, {}));
+    this.chars = []; this.wr = null; this.busy = false; this.q = {stop: null, set: null}; this.idle = Promise.resolve();
+    this.speeds = [0, 0, 0, 0];
+    this.cfg = Object.assign({profile: 'xc6', invert: [false, false, false, false], alias: '', max: 100},
+                             store.get('dev.' + this.key, {}));
+    if (!PROFILES[this.cfg.profile]) this.cfg.profile = 'xc6';
     bt.addEventListener('gattserverdisconnected', () => this.onDisconnect());
     this.buildCard();
   }
-  get key(){ return this.bt.name || this.bt.id; }
-  get label(){ return `#${this.n} ${this.bt.name || '(no name)'}`; }
-  save(){ store.set('dev.'+this.key, this.cfg); }
+  get btName(){ return (this.bt.name || '').trim(); }       // the motors pad their name with spaces
+  get key(){ return this.btName || this.bt.id; }
+  get label(){ return `#${this.n} ${this.cfg.alias || this.btName || '(no name)'}`; }
+  get profile(){ return PROFILES[this.cfg.profile]; }
+  get connected(){ return !!this.server?.connected; }
+  save(){ store.set('dev.' + this.key, this.cfg); }
   state(s, txt){ this.ui.dot.className = 'dot ' + s; this.ui.status.textContent = txt; }
 
   async connect(){
-    this.state('busy','connecting…');
+    this.state('busy', 'connecting…');
     try {
       this.server = await this.bt.gatt.connect();
       await this.discover();
-      this.state('on','connected');
+      this.state('on', 'connected');
       log(`${this.label}: connected`);
     } catch (e){
-      this.state('off','failed'); log(`${this.label}: ${e.message}`, 'err');
+      this.state('off', 'failed'); log(`${this.label}: ${e.message}`, 'err');
       if (/No Services/i.test(e.message))
-        log('Windows: pair the motor in Settings → Bluetooth first, then press Retry.', 'err');
+        log('Windows: pair the motor in Settings → Bluetooth, then press Retry.', 'err');
+      if (/GATT|connect/i.test(e.message))
+        log('Is the phone app still connected to it? A motor takes one connection at a time.', 'err');
     }
   }
 
@@ -193,93 +230,97 @@ class Motorbox {
       if (!services.length) await sleep(700);
     }
     if (!services.length)
-      for (const u of CANDIDATE_SERVICES)
-        try { services.push(await this.server.getPrimaryService(u)); } catch {}
+      try { services = [await this.server.getPrimaryService(SVC)]; } catch {}
     if (!services.length) throw new Error('No Services found in device');
-    this.chars = [];
+    this.chars = []; this.wr = null;
     const lines = [];
     for (const s of services){
       lines.push(`service ${short(s.uuid)}`);
       let cs = [];
       try { cs = await s.getCharacteristics(); } catch {}
       for (const c of cs){
-        const props = Object.entries(c.properties).filter(([,v]) => v === true).map(([k]) => k);
+        const props = Object.entries(c.properties).filter(([, v]) => v === true).map(([k]) => k);
         lines.push(`  char ${short(c.uuid)} [${props.join(',')}]`);
         this.chars.push(c);
         if (c.properties.notify || c.properties.indicate){
           c.addEventListener('characteristicvaluechanged',
-            e => this.onRx(c, new Uint8Array(e.target.value.buffer)));
+            e => this.onRx(c, new Uint8Array(e.target.value.buffer.slice(0))));
           try { await c.startNotifications(); } catch (e){ lines.push(`    (notify failed: ${e.message})`); }
         }
       }
     }
     this.ui.gatt.textContent = lines.join('\n');
     lines.forEach(l => log(`${this.label}: ${l}`));
-    this.fillWriteSelect();
+    this.wr = this.chars.find(c => short(c.uuid) === CH_WRITE.toString(16))
+           || this.chars.find(c => c.properties.write || c.properties.writeWithoutResponse) || null;
+    if (!this.wr) throw new Error('no writable characteristic (expected fff2)');
+    log(`${this.label}: writing to ${short(this.wr.uuid)}`);
   }
 
-  fillWriteSelect(){
-    const sel = this.ui.wsel; sel.textContent = '';
-    const writable = this.chars.filter(c => c.properties.write || c.properties.writeWithoutResponse);
-    for (const c of writable){
-      const o = document.createElement('option');
-      o.value = c.uuid; o.textContent = `${short(c.service.uuid)} / ${short(c.uuid)}`;
-      sel.appendChild(o);
+  onRx(c, u8){
+    log(`${this.label} RX ${short(c.uuid)}: ${hex(u8)}`, 'rx');
+    const f = parseFrame(u8);
+    if (f && f.ok && f.type === 0x01 && f.payload.length === 1){
+      this.ui.batt.textContent = `🔋 ${f.payload[0]}%`;
+      this.ui.batt.title = 'status byte from the motor, most likely battery %';
     }
-    const want = writable.find(c => c.uuid === this.cfg.writeChar) || writable[0] || null;
-    this.wr = want; if (want) sel.value = want.uuid;
   }
-
-  onRx(c, u8){ log(`${this.label} RX ${short(c.uuid)}: ${hex(u8)}`, 'rx'); }
 
   async rawWrite(u8){
-    if (!this.wr) throw new Error('no writable characteristic');
-    log(`${this.label} TX ${short(this.wr.uuid)}: ${hex(u8)}`, 'tx');
-    if (this.wr.properties.writeWithoutResponse) await this.wr.writeValueWithoutResponse(u8);
-    else await this.wr.writeValue(u8);
+    if (!this.wr) throw new Error('not connected');
+    log(`${this.label} TX: ${hex(u8)}`, 'tx');
+    if (this.wr.properties.write) await this.wr.writeValueWithResponse(u8);
+    else await this.wr.writeValueWithoutResponse(u8);
   }
 
-  // Coalescing sender: while a write is in flight, keep only the newest frame(s).
-  send(frames){
-    if (!frames) return;
-    if (!Array.isArray(frames)) frames = [frames];
-    frames = frames.filter(Boolean);
-    if (!frames.length) return;
-    if (this.busy){ this.pending = frames; return; }
+  // Coalescing sender. Writes go out one at a time; while one is in flight only the newest
+  // setpoint is kept. A stop burst (force) replaces any queued setpoint and is never dropped.
+  send(frames, {force = false} = {}){
+    frames = (Array.isArray(frames) ? frames : [frames]).filter(Boolean);
+    if (!frames.length || !this.connected) return Promise.resolve();
+    if (force){ this.q.stop = frames; this.q.set = null; } else this.q.set = frames;
+    if (!this.busy) this.idle = this.pump();
+    return this.idle;
+  }
+  async pump(){
     this.busy = true;
-    (async () => {
-      let f = frames;
-      while (f){
-        for (const fr of f){
-          try { await this.rawWrite(fr); } catch (e){ log(`${this.label}: write failed: ${e.message}`, 'err'); }
-        }
-        f = this.pending; this.pending = null;
+    while (this.q.stop || this.q.set){
+      const f = this.q.stop || this.q.set;
+      if (this.q.stop) this.q.stop = null; else this.q.set = null;
+      for (const fr of f){
+        try { await this.rawWrite(fr); } catch (e){ log(`${this.label}: write failed: ${e.message}`, 'err'); }
       }
-      this.busy = false;
-    })();
+    }
+    this.busy = false;
   }
 
   setSpeeds(sp){
-    this.speeds = sp.map((v,i) => Math.round(clamp(v,-100,100) * (this.cfg.invert[i] ? -1 : 1)));
-    this.renderWheels();
-    if (!this.server?.connected) return;
-    const multi = PROTO.motors(this.speeds);
-    if (multi) this.send(multi);
-    else this.send(this.speeds.slice(0, this.cfg.profile === 'car' ? 4 : 1).map((v,i) => PROTO.motor(i, v)));
+    this.speeds = sp.map((v, i) => Math.round(clamp(v, -100, 100) * (this.cfg.invert[i] ? -1 : 1)));
+    this.ui.render?.();
+    if (this.profile.todo){ this.warnTodo(); return; }
+    this.send(this.profile.build(this.speeds));
+  }
+
+  warnTodo(){
+    if (this.warned) return; this.warned = true;
+    log(`${this.label}: ${this.profile.label} — commands not mapped yet, nothing sent`, 'err');
   }
 
   stop(){
     this.ui.setNeutral?.();
-    this.setSpeeds([0,0,0,0]);
-    const s = PROTO.stop(); if (s && this.server?.connected) this.send(s);
+    this.speeds = [0, 0, 0, 0];
+    this.ui.render?.();
+    const s = this.profile.stopFrame();
+    if (s) return this.send(Array(STOP_REPEAT).fill(s), {force: true});
+    return Promise.resolve();
   }
 
   async disconnect(){
-    this.stop(); await sleep(150);
+    await this.stop();
     try { this.bt.gatt.disconnect(); } catch {}
   }
 
-  onDisconnect(){ this.state('off','disconnected'); log(`${this.label}: disconnected`); }
+  onDisconnect(){ this.wr = null; this.state('off', 'disconnected'); log(`${this.label}: disconnected`); }
 
   remove(){
     this.disconnect();
@@ -295,41 +336,40 @@ class Motorbox {
     card.className = 'card';
     card.innerHTML = `
       <div class="top"><span class="dot"></span><span class="name"></span>
-        <span class="hint status"></span></div>
+        <span class="hint batt"></span><span class="hint status"></span></div>
       <div class="row">
-        <select class="profile">
-          <option value="single">Single motor</option>
-          <option value="car">Omni car (4 motors)</option>
-        </select>
-        <button class="b-stop">Stop</button>
-        <button class="b-retry">Retry</button>
+        <select class="profile">${Object.entries(PROFILES).map(([k, p]) => `<option value="${k}">${p.label}</option>`).join('')}</select>
+        <span class="spacer"></span>
+        <button class="b-retry" title="Reconnect to the same motor">Retry</button>
         <button class="b-disc">Disconnect</button>
         <button class="b-rm" title="Remove from page">✕</button>
       </div>
       <div class="ctl"></div>
-      <details><summary>Advanced: GATT, raw hex, polarity</summary>
-        <pre class="gatt">(not connected)</pre>
-        <div class="row"><span class="hint">write to</span><select class="wsel"></select></div>
-        <div class="row"><input type="text" class="rawhex" placeholder="hex bytes, e.g. 5a 01 64 a5" style="flex:1;font-family:var(--mono)">
-          <button class="b-raw">Send</button></div>
+      <details><summary>Advanced: name, polarity, GATT, raw hex</summary>
+        <div class="row"><span class="hint">name</span><input type="text" class="alias" placeholder="e.g. left wheel" style="flex:1"></div>
         <div class="row inv"></div>
+        <pre class="gatt">(not connected)</pre>
+        <div class="row"><input type="text" class="rawhex" placeholder="hex, e.g. 5a 6b 02 00 05 01 80 01 00 01 (sum added if missing)" style="flex:1;font-family:var(--mono)">
+          <button class="b-raw">Send</button></div>
       </details>`;
     const q = s => card.querySelector(s);
-    this.ui = { card, dot:q('.dot'), status:q('.status'), gatt:q('.gatt'), wsel:q('.wsel'), ctl:q('.ctl'), inv:q('.inv') };
-    q('.name').textContent = this.label;
+    this.ui = { card, dot: q('.dot'), status: q('.status'), batt: q('.batt'), gatt: q('.gatt'), ctl: q('.ctl'), inv: q('.inv'), name: q('.name') };
+    this.ui.name.textContent = this.label;
     q('.profile').value = this.cfg.profile;
-    q('.profile').onchange = e => { this.cfg.profile = e.target.value; this.save(); this.stop(); this.buildControls(); };
-    q('.b-stop').onclick = () => this.stop();
+    q('.profile').onchange = e => { this.stop(); this.cfg.profile = e.target.value; this.warned = false; this.save(); this.buildControls(); };
     q('.b-retry').onclick = () => this.connect();
     q('.b-disc').onclick = () => this.disconnect();
     q('.b-rm').onclick = () => this.remove();
-    this.ui.wsel.onchange = e => {
-      this.wr = this.chars.find(c => c.uuid === e.target.value) || null;
-      this.cfg.writeChar = e.target.value; this.save();
-    };
+    q('.alias').value = this.cfg.alias;
+    q('.alias').onchange = e => { this.cfg.alias = e.target.value.trim(); this.save(); this.ui.name.textContent = this.label; };
     q('.b-raw').onclick = async () => {
-      try { await this.rawWrite(parseHex(q('.rawhex').value)); }
-      catch (e){ log(`${this.label}: ${e.message}`, 'err'); }
+      try {
+        let u8 = parseHex(q('.rawhex').value);
+        const f = parseFrame(u8);
+        if (u8[0] === 0x5a && u8[1] === 0x6b && u8.length === 5 + u8[4]) u8 = frame(u8[2], [...u8.slice(5)]);
+        else if (f && !f.ok) log(`${this.label}: warning, checksum does not match`, 'err');
+        await this.rawWrite(u8);
+      } catch (e){ log(`${this.label}: ${e.message}`, 'err'); }
     };
     q('.rawhex').onkeydown = e => { if (e.key === 'Enter') q('.b-raw').click(); };
     card.addEventListener('pointerdown', () => select(this));
@@ -339,8 +379,8 @@ class Motorbox {
   }
 
   buildInvert(){
-    const n = this.cfg.profile === 'car' ? 4 : 1;
-    const names = n === 4 ? ['FL','FR','RL','RR'] : ['motor'];
+    const n = this.profile.motors;
+    const names = n === 4 ? ['FL', 'FR', 'RL', 'RR'] : ['direction'];
     this.ui.inv.innerHTML = '<span class="hint">invert</span>';
     for (let i = 0; i < n; i++){
       const l = document.createElement('label'); l.className = 'hint';
@@ -354,86 +394,80 @@ class Motorbox {
   buildControls(){
     this.buildInvert();
     const ctl = this.ui.ctl; ctl.textContent = '';
-    this.wheelBars = [];
-    if (this.cfg.profile === 'single'){
-      ctl.innerHTML = `
-        <div class="motor"><button class="m-rev">◀</button>
-          <input type="range" min="-100" max="100" value="0" step="1">
-          <button class="m-fwd">▶</button></div>
-        <div class="row"><span class="hint">speed</span><span class="val">0</span>
-          <span class="spacer"></span><label class="hint"><input type="checkbox" class="spring" checked> spring back to 0</label></div>`;
-      const r = ctl.querySelector('input[type=range]'), v = ctl.querySelector('.val');
-      const spring = ctl.querySelector('.spring');
-      const apply = () => { v.textContent = r.value; this.setSpeeds([+r.value,0,0,0]); };
-      r.oninput = apply;
-      r.onpointerup = () => { if (spring.checked){ r.value = 0; apply(); } };
-      const hold = (btn, val) => {
-        btn.onpointerdown = () => { r.value = val; apply(); };
-        btn.onpointerup = btn.onpointerleave = () => { if (+r.value === val){ r.value = 0; apply(); } };
-      };
-      hold(ctl.querySelector('.m-rev'), -100); hold(ctl.querySelector('.m-fwd'), 100);
-      this.ui.setNeutral = () => { r.value = 0; v.textContent = '0'; };
-      this.ui.nudge = d => { r.value = clamp(+r.value + d, -100, 100); apply(); };
-    } else {
-      ctl.innerHTML = `
-        <div class="row" style="align-items:flex-start">
-          <div class="joy"><div class="knob"></div></div>
-          <div class="wheels"></div>
-        </div>
-        <div class="motor"><span class="hint">rotate</span>
-          <input type="range" class="rot" min="-100" max="100" value="0"><span class="val rv">0</span></div>
-        <div class="motor"><span class="hint">max</span>
-          <input type="range" class="max" min="10" max="100" value="${this.cfg.max ?? 100}"><span class="val mv">${this.cfg.max ?? 100}</span></div>`;
-      const wheels = ctl.querySelector('.wheels');
-      for (const nm of ['FL','FR','RL','RR']){
-        const w = document.createElement('div'); w.className = 'wheel';
-        w.innerHTML = `${nm} <span class="val">0</span><div class="bar"><i></i></div>`;
-        wheels.appendChild(w); this.wheelBars.push(w);
-      }
-      const joy = ctl.querySelector('.joy'), knob = ctl.querySelector('.knob');
-      const rot = ctl.querySelector('.rot'), rv = ctl.querySelector('.rv');
-      const mx = ctl.querySelector('.max'), mv = ctl.querySelector('.mv');
-      this.drive = {x:0, y:0, w:0};
-      const R = 90, K = 28;
-      const placeKnob = () => {
-        knob.style.left = (R - K + this.drive.x * (R - K)) + 'px';
-        knob.style.top  = (R - K - this.drive.y * (R - K)) + 'px';
-      };
-      const mix = () => {
-        const {x, y, w} = this.drive, m = (+mx.value) / 100;
-        // X-configured omni / mecanum: FL, FR, RL, RR
-        let s = [y + x + w, y - x - w, y - x + w, y + x - w];
-        const peak = Math.max(1, ...s.map(Math.abs));
-        s = s.map(v => v / peak * 100 * m);
-        this.setSpeeds(s);
-        placeKnob();
-      };
-      const fromEvent = e => {
-        const b = joy.getBoundingClientRect();
-        let x = (e.clientX - b.left - R) / (R - K), y = -(e.clientY - b.top - R) / (R - K);
-        const d = Math.hypot(x, y); if (d > 1){ x /= d; y /= d; }
-        this.drive.x = x; this.drive.y = y; mix();
-      };
-      joy.onpointerdown = e => { joy.setPointerCapture(e.pointerId); fromEvent(e); };
-      joy.onpointermove = e => { if (joy.hasPointerCapture(e.pointerId)) fromEvent(e); };
-      joy.onpointerup = joy.onpointercancel = () => { this.drive.x = this.drive.y = 0; mix(); };
-      rot.oninput = () => { this.drive.w = +rot.value / 100; rv.textContent = rot.value; mix(); };
-      rot.onpointerup = () => { rot.value = 0; rv.textContent = '0'; this.drive.w = 0; mix(); };
-      mx.oninput = () => { mv.textContent = mx.value; this.cfg.max = +mx.value; this.save(); mix(); };
-      this.ui.setNeutral = () => { this.drive = {x:0,y:0,w:0}; rot.value = 0; rv.textContent = '0'; placeKnob(); };
-      this.ui.drive = (x, y, w) => { this.drive = {x, y, w}; mix(); };
-    }
-    this.renderWheels();
+    this.ui.render = this.ui.setNeutral = this.ui.nudge = this.ui.drive = null;
+    if (this.profile.motors === 1) this.buildSingle(ctl); else this.buildCar(ctl);
   }
 
-  renderWheels(){
-    this.wheelBars?.forEach((w, i) => {
-      const v = this.speeds[i] || 0;
-      w.querySelector('.val').textContent = v;
-      const bar = w.querySelector('i');
-      bar.style.left = (v < 0 ? 50 + v/2 : 50) + '%';
-      bar.style.width = Math.abs(v/2) + '%';
-    });
+  buildSingle(ctl){
+    ctl.innerHTML = `
+      <div class="steps"><button class="m-dn" title="−10% (↓)">−</button>
+        <button class="stop m-stop">Stop</button><button class="m-up" title="+10% (↑)">+</button></div>
+      <div class="motor"><button class="m-rev" title="hold for full reverse">◀</button>
+        <input type="range" min="-100" max="100" value="0" step="1">
+        <button class="m-fwd" title="hold for full forward">▶</button></div>
+      <div class="row"><span class="big">0</span><span class="hint">%</span>
+        <span class="spacer"></span><label class="hint"><input type="checkbox" class="spring"> slider springs back to 0</label></div>`;
+    const r = ctl.querySelector('input[type=range]'), big = ctl.querySelector('.big');
+    const spring = ctl.querySelector('.spring');
+    spring.checked = !!this.cfg.spring;
+    spring.onchange = () => { this.cfg.spring = spring.checked; this.save(); };
+    const apply = v => { r.value = v; big.textContent = v; this.setSpeeds([+v, 0, 0, 0]); };
+    r.oninput = () => apply(+r.value);
+    r.onpointerup = () => { if (spring.checked) this.stop(); };
+    const hold = (btn, val) => {
+      btn.onpointerdown = e => { btn.setPointerCapture(e.pointerId); apply(val); };
+      btn.onpointerup = btn.onpointercancel = () => this.stop();
+    };
+    hold(ctl.querySelector('.m-rev'), -100); hold(ctl.querySelector('.m-fwd'), 100);
+    const step = d => apply(clamp(Math.round((+r.value + d) / 10) * 10, -100, 100));
+    ctl.querySelector('.m-up').onclick = () => step(10);
+    ctl.querySelector('.m-dn').onclick = () => step(-10);
+    ctl.querySelector('.m-stop').onclick = () => this.stop();
+    this.ui.setNeutral = () => { r.value = 0; big.textContent = '0'; };
+    this.ui.nudge = step;
+  }
+
+  buildCar(ctl){
+    ctl.innerHTML = `
+      <div class="note">XC-7 commands are not captured yet; this joystick only shows the wheel mix. Nothing is sent.</div>
+      <div class="row" style="align-items:flex-start">
+        <div class="joy"><div class="knob"></div></div>
+        <pre class="gatt wheels" style="flex:1"></pre>
+      </div>
+      <div class="motor"><span class="hint">rotate</span>
+        <input type="range" class="rot" min="-100" max="100" value="0"><span class="val rv">0</span></div>`;
+    const joy = ctl.querySelector('.joy'), knob = ctl.querySelector('.knob');
+    const rot = ctl.querySelector('.rot'), rv = ctl.querySelector('.rv'), wheels = ctl.querySelector('.wheels');
+    this.drive = {x: 0, y: 0, w: 0};
+    const R = 90, K = 28;
+    const placeKnob = () => {
+      knob.style.left = (R - K + this.drive.x * (R - K)) + 'px';
+      knob.style.top = (R - K - this.drive.y * (R - K)) + 'px';
+    };
+    const mix = () => {
+      const {x, y, w} = this.drive;
+      let s = [y + x + w, y - x - w, y - x + w, y + x - w];   // FL FR RL RR (X-drive)
+      const peak = Math.max(1, ...s.map(Math.abs));
+      this.setSpeeds(s.map(v => v / peak * 100));
+      placeKnob();
+    };
+    this.ui.render = () => {
+      wheels.textContent = ['FL', 'FR', 'RL', 'RR'].map((n, i) => `${n} ${String(this.speeds[i]).padStart(4)}`).join('\n');
+    };
+    const fromEvent = e => {
+      const b = joy.getBoundingClientRect();
+      let x = (e.clientX - b.left - R) / (R - K), y = -(e.clientY - b.top - R) / (R - K);
+      const d = Math.hypot(x, y); if (d > 1){ x /= d; y /= d; }
+      this.drive.x = x; this.drive.y = y; mix();
+    };
+    joy.onpointerdown = e => { joy.setPointerCapture(e.pointerId); fromEvent(e); };
+    joy.onpointermove = e => { if (joy.hasPointerCapture(e.pointerId)) fromEvent(e); };
+    joy.onpointerup = joy.onpointercancel = () => { this.drive.x = this.drive.y = 0; mix(); };
+    rot.oninput = () => { this.drive.w = +rot.value / 100; rv.textContent = rot.value; mix(); };
+    rot.onpointerup = () => { rot.value = 0; rv.textContent = '0'; this.drive.w = 0; mix(); };
+    this.ui.setNeutral = () => { this.drive = {x: 0, y: 0, w: 0}; rot.value = 0; rv.textContent = '0'; placeKnob(); };
+    this.ui.drive = (x, y, w) => { this.drive = {x, y, w}; mix(); };
+    this.ui.render();
   }
 }
 
@@ -448,57 +482,95 @@ function select(d){
 async function addDevice(showAll){
   let bt;
   try {
-    const filters = [...NAME_PREFIXES.map(p => ({namePrefix: p})),
-                     ...CANDIDATE_SERVICES.filter(u => typeof u === 'number' && u >= 0xff00).map(u => ({services:[u]}))];
-    bt = await navigator.bluetooth.requestDevice(showAll || !filters.length
-      ? { acceptAllDevices: true, optionalServices: CANDIDATE_SERVICES }
-      : { filters, optionalServices: CANDIDATE_SERVICES });
+    const optionalServices = [SVC, ...EXTRA_SERVICES];
+    bt = SIM ? simDevice()
+      : await navigator.bluetooth.requestDevice(showAll
+        ? { acceptAllDevices: true, optionalServices }
+        : { filters: [{namePrefix: NAME_PREFIX}, {services: [SVC]}], optionalServices });
   } catch (e){
     if (e.name !== 'NotFoundError') log(e.message, 'err');
     return;
   }
   const existing = devices.find(d => d.bt.id === bt.id);
-  if (existing){ select(existing); if (!existing.server?.connected) existing.connect(); return; }
-  const d = new Motorbox(bt); devices.push(d); select(d);
+  if (existing){ select(existing); if (!existing.connected) existing.connect(); return; }
+  const d = new Motor(bt); devices.push(d); select(d);
   await d.connect();
 }
 
 function stopAll(){ devices.forEach(d => d.stop()); log('STOP ALL'); }
 
 /* ======================================================================
+ * Simulation (?sim): fake JG_JMC motors that answer like the real one
+ * ==================================================================== */
+let simCount = 0;
+function simDevice(){
+  const n = ++simCount;
+  const uuid = s => `0000${s}-0000-1000-8000-00805f9b34fb`;
+  const svc = { uuid: uuid('fff0') };
+  const listeners = [];
+  const notify = { uuid: uuid('fff1'), service: svc, properties: {read: true, notify: true},
+    addEventListener: (t, fn) => listeners.push(fn), startNotifications: async () => notify };
+  const write = { uuid: uuid('fff2'), service: svc, properties: {write: true},
+    writeValueWithResponse: () => sleep(25 + Math.random() * 20) };
+  svc.getCharacteristics = async () => [notify, write];
+  let batt = 100 - n * 7;
+  const server = { connected: false, getPrimaryServices: async () => [svc], getPrimaryService: async () => svc };
+  const dev = new EventTarget();
+  Object.assign(dev, {
+    id: 'sim' + n, name: `JG_JMC-SIM${n}`,
+    gatt: {
+      connect: async () => {
+        await sleep(300); server.connected = true;
+        clearInterval(dev.timer);
+        dev.timer = setInterval(() => {
+          if (Math.random() < .1) batt = Math.max(5, batt - 1);
+          const value = new DataView(frame(0x01, [batt]).buffer);
+          listeners.forEach(fn => fn({target: {value}}));
+        }, 2000);
+        return server;
+      },
+      disconnect: () => { server.connected = false; clearInterval(dev.timer); dev.dispatchEvent(new Event('gattserverdisconnected')); },
+    },
+  });
+  return dev;
+}
+
+/* ======================================================================
  * Keyboard + safety
  * ==================================================================== */
 const keys = new Set();
 function keyDrive(){
-  const d = selected; if (!d) return;
-  if (d.cfg.profile === 'car' && d.ui.drive){
-    const x = (keys.has('d') ? 1 : 0) - (keys.has('a') ? 1 : 0);
-    const y = (keys.has('w') ? 1 : 0) - (keys.has('s') ? 1 : 0);
-    const w = (keys.has('e') ? 1 : 0) - (keys.has('q') ? 1 : 0);
-    d.ui.drive(x, y, w * 0.6);
-  }
+  const d = selected; if (!d?.ui.drive) return;
+  const x = (keys.has('d') ? 1 : 0) - (keys.has('a') ? 1 : 0);
+  const y = (keys.has('w') ? 1 : 0) - (keys.has('s') ? 1 : 0);
+  const w = (keys.has('e') ? 1 : 0) - (keys.has('q') ? 1 : 0);
+  d.ui.drive(x, y, w * 0.6);
 }
 addEventListener('keydown', e => {
-  if (e.target.matches('input[type=text],select')) return;
+  if (e.target.matches?.('input[type=text],select')) return;
   if (e.code === 'Space'){ e.preventDefault(); stopAll(); return; }
   const k = e.key.toLowerCase();
-  if ('wasdqe'.includes(k) && k.length === 1){ if (!keys.has(k)){ keys.add(k); keyDrive(); } e.preventDefault(); }
-  if ((k === 'arrowleft' || k === 'arrowright') && selected?.ui.nudge){
-    selected.ui.nudge(k === 'arrowright' ? 10 : -10); e.preventDefault();
+  if (/^[1-9]$/.test(k) && devices[+k - 1]){ select(devices[+k - 1]); return; }
+  if (k.length === 1 && 'wasdqe'.includes(k)){ if (!keys.has(k)){ keys.add(k); keyDrive(); } e.preventDefault(); return; }
+  if ((k === 'arrowup' || k === 'arrowdown') && selected?.ui.nudge){
+    selected.ui.nudge(k === 'arrowup' ? 10 : -10); e.preventDefault();
   }
 });
 addEventListener('keyup', e => { const k = e.key.toLowerCase(); if (keys.delete(k)) keyDrive(); });
-addEventListener('blur', () => { keys.clear(); stopAll(); });   // dead-man's switch
+addEventListener('blur', () => { keys.clear(); if (devices.some(d => d.speeds.some(Boolean))) stopAll(); });   // dead-man's switch
 addEventListener('beforeunload', () => devices.forEach(d => d.stop()));
 
 $('#btnAdd').onclick = () => addDevice(false);
 $('#btnAddAll').onclick = () => addDevice(true);
 $('#btnStopAll').onclick = stopAll;
-if (!navigator.bluetooth){
+if (SIM){
+  $('#simbar').style.display = 'block';
+  $('#btnAddAll').style.display = 'none';
+} else if (!navigator.bluetooth){
   $('#nosupport').style.display = 'block';
   $('#btnAdd').disabled = $('#btnAddAll').disabled = true;
 }
-log('ready. Web Bluetooth ' + (navigator.bluetooth ? 'available' : 'NOT available'));
+log('ready. ' + (SIM ? 'SIMULATION mode' : 'Web Bluetooth ' + (navigator.bluetooth ? 'available' : 'NOT available')));
 </script>
 </body>
 </html>
