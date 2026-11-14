@@ -30,9 +30,11 @@ and ◀ / ▶ for full speed while held.
 
 - **8-way pad**: ↑ ↓ drive, ← → strafe, and the four diagonals, which drive only one pair of opposite wheels
   (front-left + rear-right, or front-right + rear-left). Hold a button to move; release to stop.
-- **spin left / spin right**: rotate in place.
+- **⟲ / ⟳** (between the pad and the joystick): spin in place, at 70 % of the current speed.
 - **joystick**: analog driving in any direction; the **turn** slider adds rotation while driving.
-- **speed**: limits all of the above.
+- **speed**: limits all of the above (default 50 %).
+- Mecanum wheels strafe slower than they drive straight, so forward/back is scaled to match
+  (Settings → "forward/back", default 75 %). The diagonal buttons stay pure two-wheel moves.
 - the wheel display shows what each wheel is doing.
 
 | key | action |
@@ -46,6 +48,13 @@ and ◀ / ▶ for full speed while held.
 Everything stops when the window loses focus, when the page closes, and before a disconnect.
 **Settings** on each card: a name, invert switches per motor/wheel, and for the car which motor port drives
 which wheel plus "swap left/right" (defaults match the tested car).
+
+## Vendor apps
+
+The original Android apps the protocols were taken from:
+
+- XP Block / 积木Program (XC-6 motor): https://apks.samyingled.com/apk/bt/inventor.php
+- Power Box (powerbox car, model "M Serial"): http://apps.3mcloud.cc/powerbox/index.html
 
 ## Files
 

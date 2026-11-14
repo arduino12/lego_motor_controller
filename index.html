@@ -48,13 +48,13 @@ main{padding:16px}
 .steps{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .steps button{padding:10px;font-size:18px}
 /* car */
-.drive{display:flex;gap:16px;flex-wrap:wrap;align-items:center;justify-content:center}
+.drive{display:flex;flex-direction:column;gap:10px;align-items:center}
 .pad{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px);gap:6px}
 .pad button{font-size:22px;padding:0;background:var(--btn)}
 .pad button.on,.spin button.on{background:var(--acc);border-color:var(--acc);color:#fff}
 .pad .mid{font-size:13px;font-weight:600;color:#fff;background:var(--bad);border-color:var(--bad)}
-.spin{display:flex;gap:8px;justify-content:center}
-.spin button{padding:8px 14px;background:var(--btn)}
+.spin{display:flex;gap:6px}
+.spin button{width:81px;height:44px;padding:0;font-size:26px;background:var(--btn)}
 .joy{width:164px;height:164px;border-radius:50%;background:var(--track);position:relative;touch-action:none;flex:none;border:1px solid var(--line)}
 .joy .knob{width:52px;height:52px;border-radius:50%;background:var(--acc);position:absolute;left:56px;top:56px;pointer-events:none;opacity:.9}
 .joy::before,.joy::after{content:"";position:absolute;background:var(--line)}
@@ -117,6 +117,9 @@ const PB_PREFIX = 'powerbox';
 const WHEELS = ['FL', 'FR', 'RL', 'RR'];
 const PB_DEFAULT_PORTS = {FL: 'C', FR: 'D', RL: 'A', RR: 'B'};   // checked on the real car
 const PB_FLIP_STRAFE = true;                                       // its rollers mirror the textbook layout
+const PB_FWD_SCALE = 0.75;     // mecanum strafes slower than it drives straight: scale forward/back to match
+const SPIN_SCALE = 0.7;        // rotation runs at 70 % of the current speed
+const DEFAULT_SPEED = 50;      // %
 function pbFrame(ports){                                           // ports A..D in -100..100
   const enc = v => { const m = Math.round(Math.min(100, Math.abs(v)) * 127 / 100); return m ? (v < 0 ? 0x80 | m : m) : 0; };
   const f = [0xfc, 0x0f, 0x01, ...ports.map(enc), 0, 0, 0, 0, 0, 0, 0, 0];
@@ -174,7 +177,7 @@ class Device {
     this.bt = bt; this.n = ++seq; this.server = null; this.wr = null;
     this.busy = false; this.q = {stop: null, set: null}; this.idle = Promise.resolve();
     this.speeds = [0, 0, 0, 0];
-    this.cfg = Object.assign({profile: profileForName(this.btName), invert: [false, false, false, false], alias: '', max: 100},
+    this.cfg = Object.assign({profile: profileForName(this.btName), invert: [false, false, false, false], alias: '', max: DEFAULT_SPEED},
                              store.get('dev.' + this.key, {}));
     if (!PROFILES[this.cfg.profile]) this.cfg.profile = profileForName(this.btName);
     bt.addEventListener('gattserverdisconnected', () => this.onDisconnect());
@@ -355,7 +358,9 @@ class Device {
     const row = document.createElement('div'); row.className = 'row';
     row.innerHTML = '<span class="hint">ports</span>' + WHEELS.map(w =>
       `<label class="hint">${w} <select data-w="${w}">${'ABCD'.split('').map(p => `<option>${p}</option>`).join('')}</select></label>`).join('') +
-      '<label class="hint"><input type="checkbox" class="flipx"> swap left/right</label>';
+      '<label class="hint"><input type="checkbox" class="flipx"> swap left/right</label>' +
+      `<div class="motor" style="flex-basis:100%"><span class="hint" title="forward/back speed relative to sideways; lower it if the car still drives straight faster than it strafes">forward/back</span>
+        <input type="range" class="fwd" min="40" max="100" value="${Math.round((this.cfg.fwd ?? PB_FWD_SCALE) * 100)}"><span class="val fv"></span></div>`;
     this.cfg.ports = Object.assign({}, PB_DEFAULT_PORTS, this.cfg.ports);
     row.querySelectorAll('select').forEach(s => {
       s.value = this.cfg.ports[s.dataset.w];
@@ -363,6 +368,9 @@ class Device {
     });
     const fx = row.querySelector('.flipx'); fx.checked = this.cfg.flipX ?? PB_FLIP_STRAFE;
     fx.onchange = () => { this.cfg.flipX = fx.checked; this.save(); };
+    const fw = row.querySelector('.fwd'), fv = row.querySelector('.fv');
+    fv.textContent = fw.value + '%';
+    fw.oninput = () => { this.cfg.fwd = +fw.value / 100; fv.textContent = fw.value + '%'; this.save(); this.ui.mix?.(); };
     inv.after(row);
     this.ui.portRow = row;
   }
@@ -405,7 +413,8 @@ class Device {
 
   // Mecanum car. drive = {x: strafe right +, y: forward +, w: spin clockwise +}, each -1..1.
   //   FL = y + x + w   FR = y − x − w   RL = y − x + w   RR = y + x − w
-  // Pure diagonals (|x| = |y|) drive only one pair of opposite wheels; pure w spins in place.
+  // Pure diagonals (|x| = |y|, `pure`) drive only one pair of opposite wheels; pure w spins in place.
+  // Forward/back is scaled by cfg.fwd so it matches the (slower) strafe; rotation by SPIN_SCALE.
   buildCar(ctl){
     const D = Math.SQRT1_2;
     const PAD = [  // [label, x, y, title]
@@ -416,13 +425,13 @@ class Device {
     ctl.innerHTML = `
       <div class="drive">
         <div class="pad">${PAD.map((p, i) => p ? `<button data-i="${i}" title="${p[3]}">${p[0]}</button>` : '<button class="mid">STOP</button>').join('')}</div>
+        <div class="spin"><button class="sl" title="spin left in place (Q)">⟲</button><button class="sr" title="spin right in place (E)">⟳</button></div>
         <div class="joy" title="analog: drag to move in any direction"><div class="knob"></div></div>
       </div>
-      <div class="spin"><button class="sl" title="spin left in place (Q)">⟲ spin left</button><button class="sr" title="spin right in place (E)">spin right ⟳</button></div>
       <div class="motor"><span class="hint">turn</span>
         <input type="range" class="rot" min="-100" max="100" value="0" title="add rotation while driving (springs back)"><span class="val rv">0</span></div>
       <div class="motor"><span class="hint">speed</span>
-        <input type="range" class="max" min="10" max="100" value="${this.cfg.max ?? 100}"><span class="val mv">${this.cfg.max ?? 100}%</span></div>
+        <input type="range" class="max" min="10" max="100" value="${this.cfg.max ?? DEFAULT_SPEED}"><span class="val mv">${this.cfg.max ?? DEFAULT_SPEED}%</span></div>
       <div class="wheels">${WHEELS.map(w => `<div class="wheel" data-w="${w}">${w} <span class="v">0</span><div class="bar"><i></i></div></div>`).join('')}</div>`;
     const q = s => ctl.querySelector(s);
     const joy = q('.joy'), knob = q('.knob'), rot = q('.rot'), rv = q('.rv'), mx = q('.max'), mv = q('.mv');
@@ -439,15 +448,21 @@ class Device {
       knob.style.top = (R - K - this.drive.y * (R - K)) + 'px';
     };
     const mix = () => {
-      const {y, w} = this.drive, x = this.drive.x * ((this.cfg.flipX ?? PB_FLIP_STRAFE) ? -1 : 1);
-      const s = [y + x + w, y - x - w, y - x + w, y + x - w];
-      const peak = Math.max(1, ...s.map(Math.abs)), lim = (this.cfg.max ?? 100) / 100;
-      this.setSpeeds(s.map(v => v / peak * 100 * lim));
+      const {pure} = this.drive, w = this.drive.w * SPIN_SCALE;
+      const x = this.drive.x * ((this.cfg.flipX ?? PB_FLIP_STRAFE) ? -1 : 1);
+      const y = this.drive.y * (pure ? 1 : (this.cfg.fwd ?? PB_FWD_SCALE));
+      let s = [y + x + w, y - x - w, y - x + w, y + x - w];
+      const peak = Math.max(...s.map(Math.abs));
+      if (pure && peak) s = s.map(v => v / peak);          // a pure diagonal runs its wheel pair at full speed
+      else if (peak > 1) s = s.map(v => v / peak);
+      const lim = (this.cfg.max ?? DEFAULT_SPEED) / 100;
+      this.setSpeeds(s.map(v => v * 100 * lim));
       lit();
     };
-    const set = (x, y, w) => { this.drive = {x, y, w}; mix(); };
+    const set = (x, y, w, pure = false) => { this.drive = {x, y, w, pure}; mix(); };
     const hold = (btn, x, y, w) => {
-      btn.onpointerdown = e => { btn.setPointerCapture(e.pointerId); set(x, y, w); };
+      const pure = !!(x && y);                               // diagonal buttons: one opposite wheel pair only
+      btn.onpointerdown = e => { btn.setPointerCapture(e.pointerId); set(x, y, w, pure); };
       btn.onpointerup = btn.onpointercancel = () => set(0, 0, 0);
     };
     ctl.querySelectorAll('.pad button[data-i]').forEach(b => { const p = PAD[+b.dataset.i]; hold(b, p[1], p[2], 0); });
@@ -465,6 +480,7 @@ class Device {
     rot.oninput = () => { rv.textContent = rot.value; set(this.drive.x, this.drive.y, +rot.value / 100); };
     rot.onpointerup = () => { rot.value = 0; rv.textContent = '0'; set(this.drive.x, this.drive.y, 0); };
     mx.oninput = () => { this.cfg.max = +mx.value; mv.textContent = mx.value + '%'; this.save(); mix(); };
+    this.ui.mix = mix;
     this.ui.render = () => {
       ctl.querySelectorAll('.wheel').forEach((el, i) => {
         const v = this.speeds[i] || 0;
@@ -551,9 +567,10 @@ function keyDrive(){
   const d = selected; if (!d?.ui.drive) return;
   let x = (keys.has('d') ? 1 : 0) - (keys.has('a') ? 1 : 0);
   let y = (keys.has('w') ? 1 : 0) - (keys.has('s') ? 1 : 0);
-  if (x && y){ x *= Math.SQRT1_2; y *= Math.SQRT1_2; }
+  const pure = !!(x && y);                                   // two keys = pad diagonal (one wheel pair)
+  if (pure){ x *= Math.SQRT1_2; y *= Math.SQRT1_2; }
   const w = (keys.has('e') ? 1 : 0) - (keys.has('q') ? 1 : 0);
-  d.ui.drive(x, y, w);
+  d.ui.drive(x, y, w, pure && !w);
 }
 addEventListener('keydown', e => {
   if (e.target.matches?.('input[type=text],select')) return;
