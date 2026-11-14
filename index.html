@@ -61,12 +61,14 @@ pre.gatt{font:12px var(--mono);white-space:pre-wrap;margin:6px 0;max-height:220p
 #empty{color:var(--mute);padding:24px;border:1px dashed var(--line);border-radius:10px;text-align:center}
 #nosupport{display:none;background:var(--bad);color:#fff;padding:10px 16px}
 #simbar{display:none;background:var(--warn);color:#000;padding:6px 16px;font-size:13px}
+#banner{display:none;position:sticky;top:0;z-index:6;background:var(--ink);color:var(--bg);font:600 22px var(--mono);padding:10px 16px;white-space:pre}
 kbd{font:12px var(--mono);border:1px solid var(--line);border-radius:4px;padding:0 4px}
 </style>
 </head>
 <body>
 <div id="nosupport">This browser has no Web Bluetooth. Use desktop Chrome or Edge (or Chrome on Android).</div>
 <div id="simbar">Simulation mode (<code>?sim</code>): motors are fake, nothing is sent over Bluetooth.</div>
+<div id="banner"></div>
 <header>
   <h1>LEGO Motor Controller</h1>
   <button class="primary" id="btnAdd" title="Pick a motor (JG_JMC-…) from the Bluetooth chooser">+ Add motor</button>
@@ -136,6 +138,65 @@ const PROFILES = {
   },
 };
 const profileForName = n => n.startsWith(PB_PREFIX) ? 'car' : 'xc6';
+
+/* ======================================================================
+ * Probe packet families, most likely first. Each gen() returns [label, bytes[]].
+ * ==================================================================== */
+const H2 = b => b.toString(16).padStart(2, '0');
+const rng = n => [...Array(n).keys()];
+const ascii = s => [...new TextEncoder().encode(s)];
+const sum8 = a => a.reduce((x, y) => x + y, 0) & 0xff;
+const xor8 = a => a.reduce((x, y) => x ^ y, 0);
+const PROBES = {
+  known: { label: 'Known brick-hub protocols', gen: () => [
+    ...rng(4).map(p => [`LEGO PU port ${p} 100%`, [0x08, 0x00, 0x81, p, 0x11, 0x51, 0x00, 0x64]]),
+    ['BuWizz2 all +', [0x10, 0x60, 0x60, 0x60, 0x60, 0x00]],
+    ['BuWizz3 all +', [0x30, 0x60, 0x60, 0x60, 0x60, 0x60, 0x60, 0x00]],
+    ...rng(4).map(c => [`SBrick ch${c}`, [0x01, c, 0x00, 0xff]]),
+    ...'abcd'.split('').map(c => [`CircuitCubes +200${c}`, ascii(`+200${c}`)]),
+    ...rng(10).map(d => [`XPBlock len8 dir ${d + 1}`, [...frame(2, [d + 1, 0xc0, 0, 0, 1, 0, 0, 0])]]),
+    ['XPBlock len5 fwd', [...frame(2, [1, 0xc0, 1, 0, 1])]],
+  ]},
+  byte1: { label: '1 byte 00–ff', gen: () => rng(256).map(b => [`1B ${H2(b)}`, [b]]) },
+  pair:  { label: '2 bytes [cmd 00–3f, ff]', gen: () => rng(64).map(c => [`2B ${H2(c)} ff`, [c, 0xff]]) },
+  quad:  { label: '4 bytes, one motor at a time', gen: () => {
+    const out = [];
+    for (const v of [0x64, 0xff, 0x7f, 0x9c, 0x01])
+      for (let m = 0; m < 4; m++){ const a = [0, 0, 0, 0]; a[m] = v; out.push([`4B m${m + 1}=${H2(v)}`, a]); }
+    for (let m = 0; m < 4; m++){ const a = [0x80, 0x80, 0x80, 0x80]; a[m] = 0xff; out.push([`4B 80-centred m${m + 1}=ff`, a]); }
+    return out;
+  }},
+  pad8:  { label: '8 bytes [cmd 00–3f, 64, 0…]', gen: () => rng(64).map(c => [`8B ${H2(c)} 64`, [c, 0x64, 0, 0, 0, 0, 0, 0]]) },
+  headers: { label: 'Header + [01 64] (+sum/xor/len)', gen: () => {
+    const out = [];
+    for (const hd of [[0xaa], [0x55], [0xa5], [0x5a], [0xfe], [0xff], [0xa0], [0xaa, 0x55], [0x55, 0xaa], [0xa5, 0x5a], [0x5a, 0xa5], [0xfa, 0xfb], [0xab, 0xcd]]){
+      const body = [0x01, 0x64], t = hex(Uint8Array.from(hd));
+      out.push([`${t} 01 64`, [...hd, ...body]]);
+      out.push([`${t} 01 64 +sum`, [...hd, ...body, sum8([...hd, ...body])]]);
+      out.push([`${t} len 01 64 +xor`, [...hd, 2, ...body, xor8(body)]]);
+    }
+    return out;
+  }},
+  text:  { label: 'ASCII commands', gen: () => ['F', 'B', 'L', 'R', 'S', 'U', 'D', 'G', 'W', 'A', 'f', 'b', 'l', 'r', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+    '+', 'go', 'run', 'start', 'up', 'fwd', 'forward', 'M1+', 'AT', 'F100', 'A100', '#1', '$1', 'w', 'a', 'd', 'x']
+    .map(s => [`"${s}"`, ascii(s)]) },
+  pad20: { label: '20 bytes [cmd 00–3f, ff, 0…]', gen: () => rng(64).map(c => [`20B ${H2(c)} ff`, [c, 0xff, ...Array(18).fill(0)]]) },
+};
+function parseProbe(text){
+  const items = [];
+  text.split('\n').forEach((raw, i) => {
+    const l = raw.replace(/#.*/, '').trim(); if (!l) return;
+    const m = /^(.+?):\s*([0-9a-fA-F\s]+)$/.exec(l);
+    try { items.push({label: m ? m[1].trim() : `line ${i + 1}`, bytes: parseHex(m ? m[2] : l)}); } catch {}
+  });
+  return items;
+}
+function banner(text){
+  const b = document.getElementById('banner');
+  if (!b) return;
+  b.style.display = text ? 'block' : 'none';
+  b.textContent = text || '';
+}
 const STOP_REPEAT = 5;
 const PROPS = ['broadcast', 'read', 'writeWithoutResponse', 'write', 'notify', 'indicate', 'authenticatedSignedWrites', 'reliableWrite', 'writableAuxiliaries'];                              // the app sends the stop frame 5×
 
@@ -360,13 +421,22 @@ class Motor {
         <pre class="gatt">(not connected)</pre>
         <div class="row"><input type="text" class="rawhex" placeholder="hex, e.g. 5a 6b 02 00 05 01 80 01 00 01 (sum added if missing)" style="flex:1;font-family:var(--mono)">
           <button class="b-raw">Send</button></div>
+      </details>
+      <details class="probewrap"><summary>Probe: send test packets to find the protocol</summary>
         <div class="probe">
-          <div class="row"><b class="hint">Probe</b><span class="hint">sends each line, waits, moves on. Watch the hardware and press <kbd>R</kbd> when something happens.</span></div>
-          <textarea class="plist" rows="6" spellcheck="false" placeholder="one frame per line:  [label:] hex     # comment"></textarea>
-          <div class="row"><span class="hint">step</span><input type="number" class="pstep" value="1500" min="200" step="100" style="width:6em"><span class="hint">ms, then send</span>
-            <input type="text" class="pafter" placeholder="(optional) hex after each step" style="flex:1;font-family:var(--mono)"></div>
-          <div class="row"><button class="prun">Run</button><button class="pstop">Stop</button>
-            <button class="primary preact">It reacted! (R)</button><span class="big pnow"></span></div>
+          <div class="hint">Sends each packet, holds it, then sends the "after" packet and moves on. Watch the hardware and press
+            <kbd>R</kbd> the moment something happens (it pauses and logs the current and previous packet).
+            <kbd>P</kbd> pause/resume · <kbd>[</kbd> <kbd>]</kbd> previous/next · <kbd>\</kbd> again.</div>
+          <div class="row"><select class="pfam"></select><button class="pload">Load</button>
+            <span class="spacer"></span><span class="hint pcount"></span></div>
+          <textarea class="plist" rows="6" spellcheck="false" placeholder="one packet per line:  label: hex     # comment"></textarea>
+          <div class="row"><span class="hint">hold</span><input type="number" class="pstep" value="1200" min="200" step="100" style="width:6em"><span class="hint">ms, then send</span>
+            <select class="pafter"><option value="zeros">zeros, same length</option><option value="none">nothing</option><option value="custom">this hex:</option></select>
+            <input type="text" class="pafterhex" placeholder="hex" style="flex:1;min-width:6em;font-family:var(--mono)"></div>
+          <div class="row"><button class="prun primary">Run</button><button class="ppause">Pause (P)</button>
+            <button class="pprev">◀ [</button><button class="pagain">Again \</button><button class="pnext">] ▶</button>
+            <button class="pstop">Stop</button><button class="stop preact">Moved! (R)</button></div>
+          <div class="row"><span class="big pnow"></span></div>
         </div>
       </details>`;
     const q = s => card.querySelector(s);
@@ -389,44 +459,83 @@ class Motor {
       } catch (e){ log(`${this.label}: ${e.message}`, 'err'); }
     };
     q('.rawhex').onkeydown = e => { if (e.key === 'Enter') q('.b-raw').click(); };
-    this.ui.pnow = q('.pnow'); this.ui.plist = q('.plist');
+    this.ui.pnow = q('.pnow'); this.ui.plist = q('.plist'); this.ui.pcount = q('.pcount');
+    q('.pfam').innerHTML = Object.entries(PROBES).map(([k, f]) => `<option value="${k}">${f.label} (${f.gen().length})</option>`).join('');
     q('.plist').value = this.cfg.probe || '';
+    const countLines = () => { this.ui.pcount.textContent = `${parseProbe(q('.plist').value).length} packets`; };
+    countLines();
+    q('.plist').oninput = countLines;
     q('.plist').onchange = e => { this.cfg.probe = e.target.value; this.save(); };
-    q('.prun').onclick = () => { if (!this.probing) this.probeRun(q('.plist').value, +q('.pstep').value || 1500, q('.pafter').value.trim()); };
-    q('.pstop').onclick = () => { this.probing = false; };
+    q('.pload').onclick = () => {
+      q('.plist').value = PROBES[q('.pfam').value].gen().map(([l, b]) => `${l}: ${hex(Uint8Array.from(b))}`).join('\n');
+      this.cfg.probe = q('.plist').value; this.save(); countLines();
+    };
+    q('.prun').onclick = () => {
+      let custom = null;
+      if (q('.pafter').value === 'custom') try { custom = parseHex(q('.pafterhex').value); } catch (e){ log(e.message, 'err'); return; }
+      this.probeStart(parseProbe(q('.plist').value), +q('.pstep').value || 1200, q('.pafter').value, custom);
+    };
+    q('.ppause').onclick = () => this.probePause();
+    q('.pprev').onclick = () => this.probeStep(-1);
+    q('.pnext').onclick = () => this.probeStep(1);
+    q('.pagain').onclick = () => this.probeStep(0);
+    q('.pstop').onclick = () => { if (this.probe) this.probe.running = false; };
     q('.preact').onclick = () => this.reacted();
+    if (this.cfg.profile === 'car') q('.probewrap').open = true;
     card.addEventListener('pointerdown', () => select(this));
     $('#devices').appendChild(card);
     $('#empty').style.display = 'none';
     this.buildControls();
   }
 
-  /* ---------- probe: step through candidate frames while a human watches ---------- */
-  async probeRun(text, stepMs, afterHex){
-    const items = [];
-    text.split('\n').forEach((raw, i) => {
-      const l = raw.replace(/#.*/, '').trim(); if (!l) return;
-      const m = /^([^:]+):\s*(.*)$/.exec(l);
-      try { items.push({label: m ? m[1].trim() : `line ${i + 1}`, bytes: parseHex(m ? m[2] : l)}); }
-      catch (e){ log(`${this.label}: probe line ${i + 1}: ${e.message}`, 'err'); }
-    });
-    let after = null;
-    try { after = afterHex ? parseHex(afterHex) : null; } catch (e){ log(`after-hex: ${e.message}`, 'err'); return; }
-    this.probing = true; this.reactions = this.reactions || [];
-    log(`${this.label}: probe start, ${items.length} frames, ${stepMs} ms each`);
-    for (let i = 0; i < items.length && this.probing && this.connected; i++){
-      const it = items[i];
-      this.probeNow = `${i + 1}/${items.length} ${it.label}`;
-      this.ui.pnow.textContent = `${i + 1}/${items.length}`;
-      log(`${this.label} PROBE ${this.probeNow}`);
-      try { await this.rawWrite(it.bytes); } catch (e){ log(`${this.label}: ${e.message}`, 'err'); }
-      await sleep(stepMs);
-      await this.readBack();
-      if (after && this.connected) try { await this.rawWrite(after); } catch {}
+  /* ---------- probe: step through candidate packets while a human watches ---------- */
+  get probing(){ return !!this.probe?.running; }
+  async probeStart(items, holdMs, afterMode, customAfter){
+    if (this.probing){ log(`${this.label}: probe already running`, 'err'); return; }
+    if (!items.length){ log(`${this.label}: nothing to send, load a family first`, 'err'); return; }
+    const P = this.probe = {items, i: 0, hold: holdMs, afterMode, customAfter, running: true, paused: false, busy: false, prev: null};
+    log(`${this.label}: probe start, ${items.length} packets, hold ${holdMs} ms`);
+    while (P.running && P.i < P.items.length && this.connected){
+      if (P.paused || P.busy){ await sleep(80); continue; }
+      await this.probeSend(P.i);
+      if (!P.paused) P.i++;
     }
-    log(`${this.label}: probe ${this.probing ? 'done' : 'stopped'}`);
-    this.ui.pnow.textContent += this.probing ? ' ✓' : ' ■';
-    this.probing = false; this.probeNow = null;
+    log(`${this.label}: probe ${P.running ? (this.connected ? 'done' : 'lost connection') : 'stopped'} at ${P.i}/${P.items.length}`, 'err');
+    this.ui.pnow.textContent = `${P.running ? 'done' : 'stopped'} ${P.i}/${P.items.length}`;
+    banner(null);
+    P.running = false;
+  }
+  async probeSend(i){
+    const P = this.probe, it = P.items[i];
+    P.busy = true;
+    const tag = `${i + 1}/${P.items.length}  ${it.label}`;
+    P.prev = this.probeNow; this.probeNow = tag;
+    this.ui.pnow.textContent = tag; banner(tag);
+    log(`${this.label} PROBE ${tag}: ${hex(it.bytes)}`, 'err');
+    try { await this.rawWrite(it.bytes); } catch (e){ log(`${this.label}: ${e.message}`, 'err'); }
+    await sleep(P.hold);
+    await this.readBack();
+    const after = P.afterMode === 'zeros' ? new Uint8Array(it.bytes.length)
+                : P.afterMode === 'custom' ? P.customAfter : null;
+    if (after && this.connected) try { await this.rawWrite(after); } catch {}
+    await sleep(200);
+    P.busy = false;
+  }
+  probePause(force){
+    const P = this.probe; if (!P?.running) return;
+    P.paused = force ?? !P.paused;
+    log(`${this.label}: probe ${P.paused ? 'paused' : 'resumed'} at ${P.i + 1}`, 'err');
+    banner(P.paused ? `PAUSED  ${this.probeNow}` : this.probeNow);
+  }
+  async probeStep(d){                                 // while paused: replay previous / same / next packet
+    const P = this.probe; if (!P?.running || P.stepping) return;
+    if (!P.paused) this.probePause(true);
+    P.stepping = true;
+    while (P.busy) await sleep(40);                   // let the packet being held finish first
+    P.i = clamp(P.i + d, 0, P.items.length - 1);
+    await this.probeSend(P.i);
+    banner(`PAUSED  ${this.probeNow}`);
+    P.stepping = false;
   }
   // Re-read every readable characteristic and log values that changed (a device may echo its state).
   async readBack(){
@@ -441,8 +550,10 @@ class Motor {
   }
   reacted(){
     const what = this.probeNow || 'no probe running';
-    (this.reactions = this.reactions || []).push({t: performance.now(), what});
-    log(`*** ${this.label}: REACTED during ${what} ***`, 'err');
+    const prev = this.probe?.prev || '-';
+    (this.reactions = this.reactions || []).push({t: performance.now(), what, prev});
+    log(`*** ${this.label}: MOVED during ${what}   (previous: ${prev}) ***`, 'err');
+    this.probePause(true);
   }
 
   buildInvert(){
@@ -576,7 +687,8 @@ function simDevice(){
   const svc = { uuid: uuid('fff0') };
   const listeners = [];
   const notify = { uuid: uuid('fff1'), service: svc, properties: {read: true, notify: true},
-    addEventListener: (t, fn) => listeners.push(fn), startNotifications: async () => notify };
+    addEventListener: (t, fn) => listeners.push(fn), startNotifications: async () => notify,
+    readValue: async () => new DataView(frame(0x01, [batt]).buffer) };
   const write = { uuid: uuid('fff2'), service: svc, properties: {write: true},
     writeValueWithResponse: () => sleep(25 + Math.random() * 20) };
   svc.getCharacteristics = async () => [notify, write];
@@ -614,11 +726,14 @@ function keyDrive(){
   d.ui.drive(x, y, w * 0.6);
 }
 addEventListener('keydown', e => {
-  if (e.target.matches?.('input[type=text],select')) return;
+  if (e.target.matches?.('input[type=text],input[type=number],textarea,select')) return;
   if (e.code === 'Space'){ e.preventDefault(); stopAll(); return; }
   const k = e.key.toLowerCase();
   if (/^[1-9]$/.test(k) && devices[+k - 1]){ select(devices[+k - 1]); return; }
-  if (k === 'r'){ (devices.find(d => d.probing) || selected)?.reacted(); e.preventDefault(); return; }
+  const prober = devices.find(d => d.probing);
+  if (k === 'r'){ (prober || selected)?.reacted(); e.preventDefault(); return; }
+  if (prober && k === 'p'){ prober.probePause(); e.preventDefault(); return; }
+  if (prober && (k === '[' || k === ']' || k === '\\')){ prober.probeStep(k === '[' ? -1 : k === ']' ? 1 : 0); e.preventDefault(); return; }
   if (k.length === 1 && 'wasdqe'.includes(k)){ if (!keys.has(k)){ keys.add(k); keyDrive(); } e.preventDefault(); return; }
   if ((k === 'arrowup' || k === 'arrowdown') && selected?.ui.nudge){
     selected.ui.nudge(k === 'arrowup' ? 10 : -10); e.preventDefault();
