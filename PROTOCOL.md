@@ -1,8 +1,8 @@
-# XP Block / 积木Program BLE protocol
+# BLE protocols: XP Block XC-6 motor and "powerbox" mecanum car
 
 Covers the **XC-6 "POWERPACK"** single motor (battery + Bluetooth, one output shaft, advertises as
-`JG_JMC-xxxx`) and the app's **XC-7** 6-channel page. The gray **"powerbox"** mecanum car is a different
-product and is not mapped (see below).
+`JG_JMC-xxxx`), the XP Block app's **XC-7** 6-channel page, and the gray **"powerbox"** mecanum car
+(a different product with its own app, see its section).
 
 Sources:
 
@@ -94,30 +94,50 @@ Diagonals OR the bits (`05`, `06`, `09`, `0a`); strength rises 0 → `ff` with t
 about every 100 ms while a control moves; on release it sends the all-zero frame
 `5a 6b 02 00 08 00 00 00 00 01 00 00 00 d0` five times.
 
-## "powerbox" mecanum car — not mapped
+## "powerbox" mecanum car — confirmed
 
-Gray brick chassis, 4 mecanum wheels, own 2.4 GHz remote, no app. Advertises `02 01 05 09 09 "powerbox"` from
-public address `25:02:00:00:1c:43`. GATT: `0000ffa0-0002-1000-8000-00805f9b34fb` (note `-0002-`), with
-`ffa2` read+notify (reads `00 00 00 00`) and `ffa1` write; the generic `1800`/`1801` services as well.
+Gray brick chassis, 4 mecanum wheels, its own 2.4 GHz remote. Vendor app: **"Power Box"**
+(`com.yundongjia.app.blocks_powerbox` v2.1.4, Shenzhen Yundongjia), model **"M Serial"**. The XP Block and
+MK tech apps do not know it.
 
-What was tried, all with the wheels in view:
+| item | value |
+|---|---|
+| advertised name | `powerbox`, public address `25:02:00:00:1c:43`, advertising `02 01 05 09 09 "powerbox"` |
+| service | `0000ffa0-0002-1000-8000-00805f9b34fb` (note the **`-0002-`**, not the standard 16-bit base) |
+| `ffa1` | write (with response): commands |
+| `ffa2` | read + notify; reads `00 00 00 00`, never notified in any capture |
+| pairing | the app bonds, but the car also obeys an unpaired connection (Web Bluetooth, bleak) |
 
-- **XP Block app**: connects, then has nothing to send (it only knows `fff2`).
-- **576 probe packets** on `ffa1` (`index.html` probe panel): known brick-hub protocols (LEGO PU, BuWizz,
-  SBrick, Circuit Cubes), every single byte, `[cmd, speed]` pairs, per-motor 4-byte, 8/20-byte padded,
-  common headers with sum/xor/length, ASCII. Every write accepted, `ffa2` never changed, no wheel moved.
-  Once, during the full run, the car LED switched from solid to **fast blinking** (its "waiting for a
-  controller" pattern, also shown right after power-on) while the BLE link stayed up. Bisected to the first
-  20-byte packet; then narrowed with zero-filled writes: **10 and 16 bytes are fine, 19 bytes already trigger
-  it**. So it is an error path for oversized writes (short receive buffer), not a command, and real frames are
-  ≤ 16–18 bytes. Everything after the first 20-byte packet in that run (`20B 01..3f ff`) was sent in the error
-  state and does not count; those are > 16 bytes anyway.
-- **XC-7 frames streamed** every 100 ms for 2 s per direction/slider: nothing.
-- **The remote is not BLE**: an ESP32 cloning the car exactly (name, address, advertisement bytes, service)
-  got no connection; with the car's address as a BLE central it heard no directed or other advertising from the
-  remote; and the car keeps advertising while paired with the remote. The remote (16-pin chip, 24 MHz
-  crystal, PCB antenna, one button per pin) is a proprietary 2.4 GHz link. While a BLE central is connected
-  the car refuses the remote.
+**Command, 16 bytes, written to `ffa1` every 100 ms** (the app streams it continuously, also at rest):
+
+```
+fc 0f 01  A  B  C  D  00 00 00 00 00 00 00 00  sum
+│         └──┴──┴──┴─ motor ports A-D: bit 7 = reverse, bits 0-6 = speed 0..127
+└ fixed header                                  sum = (sum of the 15 bytes before it) & 0xff
+```
+
+| example | frame |
+|---|---|
+| stop | `fc 0f 01 00 00 00 00 00 00 00 00 00 00 00 00 0c` |
+| port C forward 81 % | `fc 0f 01 00 00 67 00 00 00 00 00 00 00 00 00 73` |
+| all four forward 100 % | `fc 0f 01 7f 7f 7f 7f 00 00 00 00 00 00 00 00 08` |
+| port A reverse 50 % | `fc 0f 01 c0 00 00 00 00 00 00 00 00 00 00 00 cc` |
+
+Wheel mapping on this car: **front-left = C, front-right = D, rear-left = A, rear-right = B**, all four turn the
+car-forward way for a positive value. The rollers mirror the textbook mecanum layout, so the strafe term of the
+standard mix (`FL = y+x+w, FR = y−x−w, RL = y−x+w, RR = y+x−w`) is negated. Bytes 7–14 stayed `00` in every
+capture (perhaps the expansion board's two extra ports; nothing was plugged in).
+
+Notes:
+
+- While a BLE central is connected the car ignores its 2.4 GHz remote and holds the last motor state.
+- A write longer than ~17 bytes (19 zero bytes already) makes it drop the app session: LED back to fast blink.
+
+How it was found: everything else failed (576 probe packets, XP Block frames, Mould King broadcasts, a cloned
+car for the remote). The Power Box app drove it from a Samsung Note 8 with the full Bluetooth HCI snoop log on.
+On Samsung Android 9 the log is only active after Bluetooth is toggled once with the developer setting on, it
+is not in `*#9900#` SysDump copies, but it is in an `adb bugreport` (`FS/data/log/bt/btsnoop_hci.log`).
+`dumpsys bluetooth_manager` (`tools/btsnooz.py`) keeps HCI commands/events but drops ATT data.
 
 ## Other observations
 

@@ -7,35 +7,33 @@
 <style>
 :root{
   --bg:#f6f7f9; --panel:#ffffff; --ink:#1b1f24; --mute:#5d6673; --line:#d9dde3;
-  --acc:#2563eb; --ok:#16a34a; --warn:#d97706; --bad:#dc2626; --track:#e7eaee;
+  --acc:#2563eb; --ok:#16a34a; --warn:#d97706; --bad:#dc2626; --track:#e7eaee; --btn:#eef1f5;
   --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#0f1216; --panel:#171b21; --ink:#e6e9ee; --mute:#9aa4b2; --line:#2a3039;
-    --acc:#60a5fa; --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; --track:#232933;
+    --acc:#60a5fa; --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; --track:#232933; --btn:#222831;
   }
 }
 :root[data-theme="dark"]{
   --bg:#0f1216; --panel:#171b21; --ink:#e6e9ee; --mute:#9aa4b2; --line:#2a3039;
-  --acc:#60a5fa; --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; --track:#232933;
+  --acc:#60a5fa; --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; --track:#232933; --btn:#222831;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,Segoe UI,Roboto,sans-serif}
 header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:5}
 header h1{font-size:17px;margin:0 12px 0 0}
-textarea{width:100%;font:12px var(--mono);color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px;resize:vertical}
-button,select,input[type=text],input[type=number]{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
-button{cursor:pointer;user-select:none;touch-action:manipulation}
+button,select,input[type=text]{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
+button{cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:none}
 button:hover{border-color:var(--acc)}
 button.primary{background:var(--acc);border-color:var(--acc);color:#fff}
 button.stop{background:var(--bad);border-color:var(--bad);color:#fff;font-weight:600}
 button:disabled{opacity:.5;cursor:default}
 .spacer{flex:1}
 .hint{color:var(--mute);font-size:12px}
-main{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,420px);gap:16px;padding:16px}
-@media (max-width:900px){main{grid-template-columns:minmax(0,1fr)}}
-#devices{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;align-content:start}
+main{padding:16px}
+#devices{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;align-content:start}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px}
 .card.selected{outline:2px solid var(--acc)}
 .card .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -46,64 +44,57 @@ main{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,420px);gap:16
 .motor{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center}
 .motor input[type=range]{width:100%}
 .big{font:600 28px var(--mono);min-width:5ch;text-align:center}
-.val{font-family:var(--mono);min-width:4ch;text-align:right}
+.val{font-family:var(--mono);min-width:4.5ch;text-align:right}
 .steps{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .steps button{padding:10px;font-size:18px}
-.joy{width:180px;height:180px;border-radius:50%;background:var(--track);position:relative;touch-action:none;flex:none;border:1px solid var(--line)}
-.joy .knob{width:56px;height:56px;border-radius:50%;background:var(--acc);position:absolute;left:62px;top:62px;pointer-events:none;opacity:.9}
-.note{background:var(--track);border-radius:6px;padding:8px;font-size:12px;color:var(--mute)}
+/* car */
+.drive{display:flex;gap:16px;flex-wrap:wrap;align-items:center;justify-content:center}
+.pad{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px);gap:6px}
+.pad button{font-size:22px;padding:0;background:var(--btn)}
+.pad button.on,.spin button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.pad .mid{font-size:13px;font-weight:600;color:#fff;background:var(--bad);border-color:var(--bad)}
+.spin{display:flex;gap:8px;justify-content:center}
+.spin button{padding:8px 14px;background:var(--btn)}
+.joy{width:164px;height:164px;border-radius:50%;background:var(--track);position:relative;touch-action:none;flex:none;border:1px solid var(--line)}
+.joy .knob{width:52px;height:52px;border-radius:50%;background:var(--acc);position:absolute;left:56px;top:56px;pointer-events:none;opacity:.9}
+.joy::before,.joy::after{content:"";position:absolute;background:var(--line)}
+.joy::before{left:50%;top:10%;bottom:10%;width:1px}
+.joy::after{top:50%;left:10%;right:10%;height:1px}
+.wheels{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;padding:8px;border:1px dashed var(--line);border-radius:10px}
+.wheel{font:12px var(--mono)}
+.wheel .bar{height:6px;background:var(--track);border-radius:3px;position:relative;margin-top:3px}
+.wheel .bar i{position:absolute;top:0;bottom:0;background:var(--acc);border-radius:3px}
 details{border-top:1px solid var(--line);padding-top:8px}
 summary{cursor:pointer;color:var(--mute)}
-pre.gatt{font:12px var(--mono);white-space:pre-wrap;margin:6px 0;max-height:220px;overflow:auto}
-#logpanel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;min-height:300px;max-height:calc(100vh - 100px);position:sticky;top:76px}
-#log{font:12px/1.35 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;overflow:auto;flex:1;margin:0;min-height:200px}
-#log .tx{color:var(--acc)} #log .rx{color:var(--ok)} #log .err{color:var(--bad)} #log .info{color:var(--mute)}
 #empty{color:var(--mute);padding:24px;border:1px dashed var(--line);border-radius:10px;text-align:center}
 #nosupport{display:none;background:var(--bad);color:#fff;padding:10px 16px}
 #simbar{display:none;background:var(--warn);color:#000;padding:6px 16px;font-size:13px}
-#banner{display:none;position:sticky;top:0;z-index:6;background:var(--ink);color:var(--bg);font:600 22px var(--mono);padding:10px 16px;white-space:pre}
 kbd{font:12px var(--mono);border:1px solid var(--line);border-radius:4px;padding:0 4px}
 </style>
 </head>
 <body>
 <div id="nosupport">This browser has no Web Bluetooth. Use desktop Chrome or Edge (or Chrome on Android).</div>
-<div id="simbar">Simulation mode (<code>?sim</code>): motors are fake, nothing is sent over Bluetooth.</div>
-<div id="banner"></div>
+<div id="simbar">Simulation mode (<code>?sim</code>): devices are fake, nothing is sent over Bluetooth.</div>
 <header>
   <h1>LEGO Motor Controller</h1>
-  <button class="primary" id="btnAdd" title="Pick a motor (JG_JMC-…) from the Bluetooth chooser">+ Add motor</button>
-  <button id="btnAddAll" title="Show every nearby BLE device">+ Add (show all)</button>
+  <button class="primary" id="btnAdd" title="Pick a motor (JG_JMC-…) or the car (powerbox) from the Bluetooth chooser">+ Add device</button>
   <span class="spacer"></span>
-  <span class="hint"><kbd>Space</kbd> stop all · <kbd>1</kbd>–<kbd>9</kbd> select · <kbd>↑</kbd><kbd>↓</kbd> speed ±10 · <kbd>W A S D</kbd><kbd>Q E</kbd> car · <kbd>R</kbd> probe hit</span>
+  <span class="hint"><kbd>Space</kbd> stop all · <kbd>1</kbd>–<kbd>9</kbd> select · <kbd>↑</kbd><kbd>↓</kbd> motor ±10 % · car: <kbd>W A S D</kbd> move, <kbd>Q E</kbd> spin</span>
   <button class="stop" id="btnStopAll">STOP ALL</button>
 </header>
 <main>
-  <section id="devices"><div id="empty">No motors yet. Switch a motor on (close the phone app so it lets go), then press <b>+ Add motor</b> and pick <b>JG_JMC-…</b>. Repeat for each motor.</div></section>
-  <aside id="logpanel">
-    <div class="row"><b style="flex:1">Log</b>
-      <label class="hint"><input type="checkbox" id="logTx" checked> TX</label>
-      <label class="hint"><input type="checkbox" id="logRx"> RX</label>
-      <button id="btnLogSave">Save</button><button id="btnLogClear">Clear</button></div>
-    <pre id="log"></pre>
-  </aside>
+  <section id="devices"><div id="empty">Nothing connected. Switch a motor or the car on (close any phone app connected to it),
+    press <b>+ Add device</b> and pick <b>JG_JMC-…</b> (motor) or <b>powerbox</b> (car). Repeat for each device.</div></section>
 </main>
 <script>
 'use strict';
 /* ======================================================================
- * Protocol (decoded from 积木Program / XP Block v3.1.0 + HCI capture, see PROTOCOL.md)
- *   GATT service fff0, write fff2 (write-with-response), notify fff1.
- *   Frame:  5a 6b <type> 00 <len> <payload…> <sum>
- *           type 02 = command (phone→motor), 01 = status (motor→phone)
- *           sum  = (sum of every preceding byte) & 0xff
+ * Protocols (see PROTOCOL.md)
  * ==================================================================== */
-const SVC = 0xfff0, CH_WRITE = 0xfff2, CH_NOTIFY = 0xfff1;
+// XC-6 single motor (XP Block app): service fff0, write fff2.
+//   5a 6b 02 00 05 [dir, speed, dir, 00, 01] sum8        dir 01 fwd, 02 rev, 00 stop; speed 0..255
+const SVC = 0xfff0, CH_WRITE = 0xfff2;
 const NAME_PREFIX = 'JG_JMC';
-// "powerbox" mecanum car (came with its own remote, no app). Non-standard base: note the -0002-.
-const PB_SVC = '0000ffa0-0002-1000-8000-00805f9b34fb';
-const PB_WRITE = '0000ffa1-0002-1000-8000-00805f9b34fb', PB_NOTIFY = '0000ffa2-0002-1000-8000-00805f9b34fb';
-const PB_PREFIX = 'powerbox';
-const EXTRA_SERVICES = [0x180a, 0x180f, '0000ffa0-0000-1000-8000-00805f9b34fb'];   // extras for the GATT map
-
 function frame(type, payload){
   const f = [0x5a, 0x6b, type, 0x00, payload.length, ...payload];
   f.push(f.reduce((a, b) => a + b, 0) & 0xff);
@@ -117,10 +108,23 @@ function parseFrame(u8){
   return { type: u8[2], payload: u8.slice(5, 5 + len), ok: sum === u8[5 + len] };
 }
 
+// "powerbox" mecanum car (Power Box app, "M Serial"): service ffa0, write ffa1 (non-standard -0002- base).
+//   fc 0f 01 [A] [B] [C] [D] 00×8 sum8 (16 bytes), resent every 100 ms
+//   motor byte: bit 7 = reverse, bits 0-6 = speed 0..127
+const PB_SVC = '0000ffa0-0002-1000-8000-00805f9b34fb';
+const PB_WRITE = '0000ffa1-0002-1000-8000-00805f9b34fb';
+const PB_PREFIX = 'powerbox';
+const WHEELS = ['FL', 'FR', 'RL', 'RR'];
+const PB_DEFAULT_PORTS = {FL: 'C', FR: 'D', RL: 'A', RR: 'B'};   // checked on the real car
+const PB_FLIP_STRAFE = true;                                       // its rollers mirror the textbook layout
+function pbFrame(ports){                                           // ports A..D in -100..100
+  const enc = v => { const m = Math.round(Math.min(100, Math.abs(v)) * 127 / 100); return m ? (v < 0 ? 0x80 | m : m) : 0; };
+  const f = [0xfc, 0x0f, 0x01, ...ports.map(enc), 0, 0, 0, 0, 0, 0, 0, 0];
+  f.push(f.reduce((a, b) => a + b, 0) & 0xff);
+  return Uint8Array.from(f);
+}
+
 const PROFILES = {
-  // XC-6 "POWERPACK" single motor. payload = [dir, speed, dir, 00, 01]
-  //   dir 01 = forward ("+"), 02 = reverse ("−"), 00 = stop; speed 0..255.
-  //   Bytes 3..5 are copied verbatim from the app; their meaning is not known.
   xc6: {
     label: 'XC-6 motor', motors: 1,
     build(speeds){
@@ -130,124 +134,33 @@ const PROFILES = {
       return [frame(0x02, [dir, spd, dir, 0x00, 0x01])];
     },
     stopFrame(){ return frame(0x02, [0, 0, 0, 0, 1]); },
+    stopRepeat: 5,
   },
-  // "powerbox" gray mecanum car: protocol not known yet (use the probe panel). Nothing is sent.
   car: {
-    label: 'powerbox car (not mapped yet)', motors: 4, todo: true,
-    build(){ return []; }, stopFrame(){ return null; },
+    label: 'powerbox mecanum car', motors: 4, keepalive: 100,
+    build(speeds, cfg){
+      const ports = [0, 0, 0, 0];
+      WHEELS.forEach((w, i) => { ports['ABCD'.indexOf(cfg.ports?.[w] || PB_DEFAULT_PORTS[w])] = speeds[i]; });
+      return [pbFrame(ports)];
+    },
+    stopFrame(){ return pbFrame([0, 0, 0, 0]); },
+    stopRepeat: 3,
   },
 };
 const profileForName = n => n.startsWith(PB_PREFIX) ? 'car' : 'xc6';
 
 /* ======================================================================
- * Probe packet families, most likely first. Each gen() returns [label, bytes[]].
- * ==================================================================== */
-const H2 = b => b.toString(16).padStart(2, '0');
-const rng = n => [...Array(n).keys()];
-const ascii = s => [...new TextEncoder().encode(s)];
-const sum8 = a => a.reduce((x, y) => x + y, 0) & 0xff;
-const xor8 = a => a.reduce((x, y) => x ^ y, 0);
-const PROBES = {
-  known: { label: 'Known brick-hub protocols', gen: () => [
-    ...rng(4).map(p => [`LEGO PU port ${p} 100%`, [0x08, 0x00, 0x81, p, 0x11, 0x51, 0x00, 0x64]]),
-    ['BuWizz2 all +', [0x10, 0x60, 0x60, 0x60, 0x60, 0x00]],
-    ['BuWizz3 all +', [0x30, 0x60, 0x60, 0x60, 0x60, 0x60, 0x60, 0x00]],
-    ...rng(4).map(c => [`SBrick ch${c}`, [0x01, c, 0x00, 0xff]]),
-    ...'abcd'.split('').map(c => [`CircuitCubes +200${c}`, ascii(`+200${c}`)]),
-    ...rng(10).map(d => [`XPBlock len8 dir ${d + 1}`, [...frame(2, [d + 1, 0xc0, 0, 0, 1, 0, 0, 0])]]),
-    ['XPBlock len5 fwd', [...frame(2, [1, 0xc0, 1, 0, 1])]],
-  ]},
-  byte1: { label: '1 byte 00–ff', gen: () => rng(256).map(b => [`1B ${H2(b)}`, [b]]) },
-  pair:  { label: '2 bytes [cmd 00–3f, ff]', gen: () => rng(64).map(c => [`2B ${H2(c)} ff`, [c, 0xff]]) },
-  quad:  { label: '4 bytes, one motor at a time', gen: () => {
-    const out = [];
-    for (const v of [0x64, 0xff, 0x7f, 0x9c, 0x01])
-      for (let m = 0; m < 4; m++){ const a = [0, 0, 0, 0]; a[m] = v; out.push([`4B m${m + 1}=${H2(v)}`, a]); }
-    for (let m = 0; m < 4; m++){ const a = [0x80, 0x80, 0x80, 0x80]; a[m] = 0xff; out.push([`4B 80-centred m${m + 1}=ff`, a]); }
-    return out;
-  }},
-  pad8:  { label: '8 bytes [cmd 00–3f, 64, 0…]', gen: () => rng(64).map(c => [`8B ${H2(c)} 64`, [c, 0x64, 0, 0, 0, 0, 0, 0]]) },
-  headers: { label: 'Header + [01 64] (+sum/xor/len)', gen: () => {
-    const out = [];
-    for (const hd of [[0xaa], [0x55], [0xa5], [0x5a], [0xfe], [0xff], [0xa0], [0xaa, 0x55], [0x55, 0xaa], [0xa5, 0x5a], [0x5a, 0xa5], [0xfa, 0xfb], [0xab, 0xcd]]){
-      const body = [0x01, 0x64], t = hex(Uint8Array.from(hd));
-      out.push([`${t} 01 64`, [...hd, ...body]]);
-      out.push([`${t} 01 64 +sum`, [...hd, ...body, sum8([...hd, ...body])]]);
-      out.push([`${t} len 01 64 +xor`, [...hd, 2, ...body, xor8(body)]]);
-    }
-    return out;
-  }},
-  text:  { label: 'ASCII commands', gen: () => ['F', 'B', 'L', 'R', 'S', 'U', 'D', 'G', 'W', 'A', 'f', 'b', 'l', 'r', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-    '+', 'go', 'run', 'start', 'up', 'fwd', 'forward', 'M1+', 'AT', 'F100', 'A100', '#1', '$1', 'w', 'a', 'd', 'x']
-    .map(s => [`"${s}"`, ascii(s)]) },
-  pad20: { label: '20 bytes [cmd 00–3f, ff, 0…]', gen: () => rng(64).map(c => [`20B ${H2(c)} ff`, [c, 0xff, ...Array(18).fill(0)]]) },
-};
-function parseProbe(text){
-  const items = [];
-  text.split('\n').forEach((raw, i) => {
-    const l = raw.replace(/#.*/, '').trim(); if (!l) return;
-    const m = /^(.+?):\s*([0-9a-fA-F\s]+)$/.exec(l);
-    try { items.push({label: m ? m[1].trim() : `line ${i + 1}`, bytes: parseHex(m ? m[2] : l)}); } catch {}
-  });
-  return items;
-}
-function banner(text){
-  const b = document.getElementById('banner');
-  if (!b) return;
-  b.style.display = text ? 'block' : 'none';
-  b.textContent = text || '';
-}
-const STOP_REPEAT = 5;
-const PROPS = ['broadcast', 'read', 'writeWithoutResponse', 'write', 'notify', 'indicate', 'authenticatedSignedWrites', 'reliableWrite', 'writableAuxiliaries'];                              // the app sends the stop frame 5×
-
-/* ======================================================================
  * Utilities
  * ==================================================================== */
 const $ = s => document.querySelector(s);
-const hex = u8 => [...u8].map(b => b.toString(16).padStart(2, '0')).join(' ');
-const parseHex = s => {
-  const t = s.replace(/0x/gi, '').replace(/[^0-9a-f]/gi, '');
-  if (t.length % 2) throw new Error('odd number of hex digits');
-  return Uint8Array.from(t.match(/../g) || [], h => parseInt(h, 16));
-};
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const store = {
   get(k, d){ try { const v = localStorage.getItem('lmc.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v){ try { localStorage.setItem('lmc.' + k, JSON.stringify(v)); } catch {} },
 };
-const short = u => {
-  const m = /^0000([0-9a-f]{4})-000([0-9a-f])-1000-8000-00805f9b34fb$/i.exec(u);
-  return m ? (m[2] === '0' ? m[1] : `${m[1]}/${m[2]}`) : u;
-};
 const SIM = new URLSearchParams(location.search).has('sim');
-
-/* ======================================================================
- * Log
- * ==================================================================== */
-const logEl = $('#log'), logLines = [];
-const t0 = performance.now();
-function log(msg, cls = 'info'){
-  const t = ((performance.now() - t0) / 1000).toFixed(3).padStart(8);
-  const line = `${t} ${msg}`;
-  logLines.push(line);
-  if (logLines.length > 20000) logLines.splice(0, 5000);
-  if (cls === 'tx' && !$('#logTx').checked) return;
-  if (cls === 'rx' && !$('#logRx').checked) return;
-  const span = document.createElement('span');
-  span.className = cls; span.textContent = line + '\n';
-  const stick = logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 4;
-  logEl.appendChild(span);
-  while (logEl.childNodes.length > 1500) logEl.firstChild.remove();
-  if (stick) logEl.scrollTop = logEl.scrollHeight;
-}
-$('#btnLogClear').onclick = () => { logEl.textContent = ''; logLines.length = 0; };
-$('#btnLogSave').onclick = () => {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([logLines.join('\n')], {type: 'text/plain'}));
-  a.download = `lego-motor-log-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
-  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-};
+const log = (...a) => console.debug('[lmc]', ...a);
 
 /* ======================================================================
  * Device
@@ -256,10 +169,10 @@ const devices = [];
 let selected = null;
 let seq = 0;
 
-class Motor {
+class Device {
   constructor(bt){
-    this.bt = bt; this.n = ++seq; this.server = null;
-    this.chars = []; this.wr = null; this.busy = false; this.q = {stop: null, set: null}; this.idle = Promise.resolve();
+    this.bt = bt; this.n = ++seq; this.server = null; this.wr = null;
+    this.busy = false; this.q = {stop: null, set: null}; this.idle = Promise.resolve();
     this.speeds = [0, 0, 0, 0];
     this.cfg = Object.assign({profile: profileForName(this.btName), invert: [false, false, false, false], alias: '', max: 100},
                              store.get('dev.' + this.key, {}));
@@ -269,7 +182,7 @@ class Motor {
   }
   get btName(){ return (this.bt.name || '').trim(); }       // the motors pad their name with spaces
   get key(){ return this.btName || this.bt.id; }
-  get label(){ return `#${this.n} ${this.cfg.alias || this.btName || '(no name)'}`; }
+  get label(){ return this.cfg.alias || this.btName || '(no name)'; }
   get profile(){ return PROFILES[this.cfg.profile]; }
   get connected(){ return !!this.server?.connected; }
   save(){ store.set('dev.' + this.key, this.cfg); }
@@ -281,13 +194,10 @@ class Motor {
       this.server = await this.bt.gatt.connect();
       await this.discover();
       this.state('on', 'connected');
-      log(`${this.label}: connected`);
+      this.startKeepalive();
     } catch (e){
-      this.state('off', 'failed'); log(`${this.label}: ${e.message}`, 'err');
-      if (/No Services/i.test(e.message))
-        log('Windows: pair the motor in Settings → Bluetooth, then press Retry.', 'err');
-      if (/GATT|connect/i.test(e.message))
-        log('Is the phone app still connected to it? A motor takes one connection at a time.', 'err');
+      this.state('off', 'failed: ' + e.message);
+      log(this.label, e);
     }
   }
 
@@ -299,36 +209,25 @@ class Motor {
     }
     if (!services.length)
       for (const u of [SVC, PB_SVC]) try { services.push(await this.server.getPrimaryService(u)); } catch {}
-    if (!services.length) throw new Error('No Services found in device');
-    this.chars = []; this.wr = null;
-    const lines = [];
+    if (!services.length) throw new Error('no services (on Windows, pair it in Bluetooth settings and retry)');
+    const chars = [];
     for (const s of services){
-      lines.push(`service ${short(s.uuid)}`);
       let cs = [];
       try { cs = await s.getCharacteristics(); } catch {}
       for (const c of cs){
-        const props = PROPS.filter(k => c.properties[k]);   // getters on the prototype: Object.entries() sees none
-        lines.push(`  char ${short(c.uuid)} [${props.join(',')}]`);
-        this.chars.push(c);
-        if (c.properties.read)
-          try { lines.push(`    value: ${hex(new Uint8Array((await c.readValue()).buffer))}`); } catch (e){ lines.push(`    (read failed: ${e.message})`); }
+        chars.push(c);
         if (c.properties.notify || c.properties.indicate){
-          c.addEventListener('characteristicvaluechanged',
-            e => this.onRx(c, new Uint8Array(e.target.value.buffer.slice(0))));
-          try { await c.startNotifications(); } catch (e){ lines.push(`    (notify failed: ${e.message})`); }
+          c.addEventListener('characteristicvaluechanged', e => this.onRx(new Uint8Array(e.target.value.buffer.slice(0))));
+          try { await c.startNotifications(); } catch {}
         }
       }
     }
-    this.ui.gatt.textContent = lines.join('\n');
-    lines.forEach(l => log(`${this.label}: ${l}`));
-    this.wr = this.chars.find(c => short(c.uuid) === CH_WRITE.toString(16) || c.uuid === PB_WRITE)
-           || this.chars.find(c => c.properties.write || c.properties.writeWithoutResponse) || null;
-    if (!this.wr) throw new Error('no writable characteristic (expected fff2 or ffa1)');
-    log(`${this.label}: writing to ${short(this.wr.uuid)}`);
+    this.wr = chars.find(c => c.uuid === `0000${CH_WRITE.toString(16)}-0000-1000-8000-00805f9b34fb` || c.uuid === PB_WRITE)
+           || chars.find(c => c.properties.write || c.properties.writeWithoutResponse) || null;
+    if (!this.wr) throw new Error('no command characteristic');
   }
 
-  onRx(c, u8){
-    log(`${this.label} RX ${short(c.uuid)}: ${hex(u8)}`, 'rx');
+  onRx(u8){
     const f = parseFrame(u8);
     if (f && f.ok && f.type === 0x01 && f.payload.length === 1){
       this.ui.batt.textContent = `🔋 ${f.payload[0]}%`;
@@ -338,13 +237,12 @@ class Motor {
 
   async rawWrite(u8){
     if (!this.wr) throw new Error('not connected');
-    log(`${this.label} TX: ${hex(u8)}`, 'tx');
     if (this.wr.properties.write) await this.wr.writeValueWithResponse(u8);
     else await this.wr.writeValueWithoutResponse(u8);
   }
 
-  // Coalescing sender. Writes go out one at a time; while one is in flight only the newest
-  // setpoint is kept. A stop burst (force) replaces any queued setpoint and is never dropped.
+  // One write at a time; while one is in flight only the newest setpoint is kept.
+  // A stop burst (force) replaces any queued setpoint and is never dropped.
   send(frames, {force = false} = {}){
     frames = (Array.isArray(frames) ? frames : [frames]).filter(Boolean);
     if (!frames.length || !this.connected) return Promise.resolve();
@@ -358,7 +256,7 @@ class Motor {
       const f = this.q.stop || this.q.set;
       if (this.q.stop) this.q.stop = null; else this.q.set = null;
       for (const fr of f){
-        try { await this.rawWrite(fr); } catch (e){ log(`${this.label}: write failed: ${e.message}`, 'err'); }
+        try { await this.rawWrite(fr); } catch (e){ log(this.label, 'write failed', e.message); }
       }
     }
     this.busy = false;
@@ -367,13 +265,17 @@ class Motor {
   setSpeeds(sp){
     this.speeds = sp.map((v, i) => Math.round(clamp(v, -100, 100) * (this.cfg.invert[i] ? -1 : 1)));
     this.ui.render?.();
-    if (this.profile.todo){ this.warnTodo(); return; }
-    this.send(this.profile.build(this.speeds));
+    this.send(this.profile.build(this.speeds, this.cfg));
   }
 
-  warnTodo(){
-    if (this.warned) return; this.warned = true;
-    log(`${this.label}: ${this.profile.label} — commands not mapped yet, nothing sent`, 'err');
+  // The car wants its frame resent every 100 ms, like the vendor app does.
+  startKeepalive(){
+    clearInterval(this.ka);
+    const ms = this.profile.keepalive;
+    if (!ms) return;
+    this.ka = setInterval(() => {
+      if (this.connected && !this.busy) this.send(this.profile.build(this.speeds, this.cfg));
+    }, ms);
   }
 
   stop(){
@@ -381,16 +283,16 @@ class Motor {
     this.speeds = [0, 0, 0, 0];
     this.ui.render?.();
     const s = this.profile.stopFrame();
-    if (s) return this.send(Array(STOP_REPEAT).fill(s), {force: true});
-    return Promise.resolve();
+    return this.send(Array(this.profile.stopRepeat || 1).fill(s), {force: true});
   }
 
   async disconnect(){
     await this.stop();
+    clearInterval(this.ka);
     try { this.bt.gatt.disconnect(); } catch {}
   }
 
-  onDisconnect(){ this.wr = null; this.state('off', 'disconnected'); log(`${this.label}: disconnected`); }
+  onDisconnect(){ clearInterval(this.ka); this.wr = null; this.state('off', 'disconnected'); }
 
   remove(){
     this.disconnect();
@@ -410,167 +312,63 @@ class Motor {
       <div class="row">
         <select class="profile">${Object.entries(PROFILES).map(([k, p]) => `<option value="${k}">${p.label}</option>`).join('')}</select>
         <span class="spacer"></span>
-        <button class="b-retry" title="Reconnect to the same motor">Retry</button>
+        <button class="b-retry" title="Reconnect to the same device">Reconnect</button>
         <button class="b-disc">Disconnect</button>
         <button class="b-rm" title="Remove from page">✕</button>
       </div>
       <div class="ctl"></div>
-      <details><summary>Advanced: name, polarity, GATT, raw hex</summary>
-        <div class="row"><span class="hint">name</span><input type="text" class="alias" placeholder="e.g. left wheel" style="flex:1"></div>
+      <details><summary>Settings</summary>
+        <div class="row"><span class="hint">name</span><input type="text" class="alias" placeholder="e.g. crane winch" style="flex:1"></div>
         <div class="row inv"></div>
-        <pre class="gatt">(not connected)</pre>
-        <div class="row"><input type="text" class="rawhex" placeholder="hex, e.g. 5a 6b 02 00 05 01 80 01 00 01 (sum added if missing)" style="flex:1;font-family:var(--mono)">
-          <button class="b-raw">Send</button></div>
-      </details>
-      <details class="probewrap"><summary>Probe: send test packets to find the protocol</summary>
-        <div class="probe">
-          <div class="hint">Sends each packet, holds it, then sends the "after" packet and moves on. Watch the hardware and press
-            <kbd>R</kbd> the moment something happens (it pauses and logs the current and previous packet).
-            <kbd>P</kbd> pause/resume · <kbd>[</kbd> <kbd>]</kbd> previous/next · <kbd>\</kbd> again.</div>
-          <div class="row"><select class="pfam"></select><button class="pload">Load</button>
-            <span class="spacer"></span><span class="hint pcount"></span></div>
-          <textarea class="plist" rows="6" spellcheck="false" placeholder="one packet per line:  label: hex     # comment"></textarea>
-          <div class="row"><span class="hint">hold</span><input type="number" class="pstep" value="1200" min="200" step="100" style="width:6em"><span class="hint">ms, then send</span>
-            <select class="pafter"><option value="zeros">zeros, same length</option><option value="none">nothing</option><option value="custom">this hex:</option></select>
-            <input type="text" class="pafterhex" placeholder="hex" style="flex:1;min-width:6em;font-family:var(--mono)"></div>
-          <div class="row"><button class="prun primary">Run</button><button class="ppause">Pause (P)</button>
-            <button class="pprev">◀ [</button><button class="pagain">Again \</button><button class="pnext">] ▶</button>
-            <button class="pstop">Stop</button><button class="stop preact">Moved! (R)</button></div>
-          <div class="row"><span class="big pnow"></span></div>
-        </div>
       </details>`;
     const q = s => card.querySelector(s);
-    this.ui = { card, dot: q('.dot'), status: q('.status'), batt: q('.batt'), gatt: q('.gatt'), ctl: q('.ctl'), inv: q('.inv'), name: q('.name') };
-    this.ui.name.textContent = this.label;
+    this.ui = { card, dot: q('.dot'), status: q('.status'), batt: q('.batt'), ctl: q('.ctl'), inv: q('.inv'), name: q('.name') };
+    this.ui.name.textContent = `#${this.n} ${this.label}`;
     q('.profile').value = this.cfg.profile;
-    q('.profile').onchange = e => { this.stop(); this.cfg.profile = e.target.value; this.warned = false; this.save(); this.buildControls(); };
+    q('.profile').onchange = e => { this.stop(); this.cfg.profile = e.target.value; this.save(); this.buildControls(); this.startKeepalive(); };
     q('.b-retry').onclick = () => this.connect();
     q('.b-disc').onclick = () => this.disconnect();
     q('.b-rm').onclick = () => this.remove();
     q('.alias').value = this.cfg.alias;
-    q('.alias').onchange = e => { this.cfg.alias = e.target.value.trim(); this.save(); this.ui.name.textContent = this.label; };
-    q('.b-raw').onclick = async () => {
-      try {
-        let u8 = parseHex(q('.rawhex').value);
-        const f = parseFrame(u8);
-        if (u8[0] === 0x5a && u8[1] === 0x6b && u8.length === 5 + u8[4]) u8 = frame(u8[2], [...u8.slice(5)]);
-        else if (f && !f.ok) log(`${this.label}: warning, checksum does not match`, 'err');
-        await this.rawWrite(u8);
-      } catch (e){ log(`${this.label}: ${e.message}`, 'err'); }
-    };
-    q('.rawhex').onkeydown = e => { if (e.key === 'Enter') q('.b-raw').click(); };
-    this.ui.pnow = q('.pnow'); this.ui.plist = q('.plist'); this.ui.pcount = q('.pcount');
-    q('.pfam').innerHTML = Object.entries(PROBES).map(([k, f]) => `<option value="${k}">${f.label} (${f.gen().length})</option>`).join('');
-    q('.plist').value = this.cfg.probe || '';
-    const countLines = () => { this.ui.pcount.textContent = `${parseProbe(q('.plist').value).length} packets`; };
-    countLines();
-    q('.plist').oninput = countLines;
-    q('.plist').onchange = e => { this.cfg.probe = e.target.value; this.save(); };
-    q('.pload').onclick = () => {
-      q('.plist').value = PROBES[q('.pfam').value].gen().map(([l, b]) => `${l}: ${hex(Uint8Array.from(b))}`).join('\n');
-      this.cfg.probe = q('.plist').value; this.save(); countLines();
-    };
-    q('.prun').onclick = () => {
-      let custom = null;
-      if (q('.pafter').value === 'custom') try { custom = parseHex(q('.pafterhex').value); } catch (e){ log(e.message, 'err'); return; }
-      this.probeStart(parseProbe(q('.plist').value), +q('.pstep').value || 1200, q('.pafter').value, custom);
-    };
-    q('.ppause').onclick = () => this.probePause();
-    q('.pprev').onclick = () => this.probeStep(-1);
-    q('.pnext').onclick = () => this.probeStep(1);
-    q('.pagain').onclick = () => this.probeStep(0);
-    q('.pstop').onclick = () => { if (this.probe) this.probe.running = false; };
-    q('.preact').onclick = () => this.reacted();
-    if (this.cfg.profile === 'car') q('.probewrap').open = true;
+    q('.alias').onchange = e => { this.cfg.alias = e.target.value.trim(); this.save(); this.ui.name.textContent = `#${this.n} ${this.label}`; };
     card.addEventListener('pointerdown', () => select(this));
     $('#devices').appendChild(card);
     $('#empty').style.display = 'none';
     this.buildControls();
   }
 
-  /* ---------- probe: step through candidate packets while a human watches ---------- */
-  get probing(){ return !!this.probe?.running; }
-  async probeStart(items, holdMs, afterMode, customAfter){
-    if (this.probing){ log(`${this.label}: probe already running`, 'err'); return; }
-    if (!items.length){ log(`${this.label}: nothing to send, load a family first`, 'err'); return; }
-    const P = this.probe = {items, i: 0, hold: holdMs, afterMode, customAfter, running: true, paused: false, busy: false, prev: null};
-    log(`${this.label}: probe start, ${items.length} packets, hold ${holdMs} ms`);
-    while (P.running && P.i < P.items.length && this.connected){
-      if (P.paused || P.busy){ await sleep(80); continue; }
-      await this.probeSend(P.i);
-      if (!P.paused) P.i++;
-    }
-    log(`${this.label}: probe ${P.running ? (this.connected ? 'done' : 'lost connection') : 'stopped'} at ${P.i}/${P.items.length}`, 'err');
-    this.ui.pnow.textContent = `${P.running ? 'done' : 'stopped'} ${P.i}/${P.items.length}`;
-    banner(null);
-    P.running = false;
-  }
-  async probeSend(i){
-    const P = this.probe, it = P.items[i];
-    P.busy = true;
-    const tag = `${i + 1}/${P.items.length}  ${it.label}`;
-    P.prev = this.probeNow; this.probeNow = tag;
-    this.ui.pnow.textContent = tag; banner(tag);
-    log(`${this.label} PROBE ${tag}: ${hex(it.bytes)}`, 'err');
-    try { await this.rawWrite(it.bytes); } catch (e){ log(`${this.label}: ${e.message}`, 'err'); }
-    await sleep(P.hold);
-    await this.readBack();
-    const after = P.afterMode === 'zeros' ? new Uint8Array(it.bytes.length)
-                : P.afterMode === 'custom' ? P.customAfter : null;
-    if (after && this.connected) try { await this.rawWrite(after); } catch {}
-    await sleep(200);
-    P.busy = false;
-  }
-  probePause(force){
-    const P = this.probe; if (!P?.running) return;
-    P.paused = force ?? !P.paused;
-    log(`${this.label}: probe ${P.paused ? 'paused' : 'resumed'} at ${P.i + 1}`, 'err');
-    banner(P.paused ? `PAUSED  ${this.probeNow}` : this.probeNow);
-  }
-  async probeStep(d){                                 // while paused: replay previous / same / next packet
-    const P = this.probe; if (!P?.running || P.stepping) return;
-    if (!P.paused) this.probePause(true);
-    P.stepping = true;
-    while (P.busy) await sleep(40);                   // let the packet being held finish first
-    P.i = clamp(P.i + d, 0, P.items.length - 1);
-    await this.probeSend(P.i);
-    banner(`PAUSED  ${this.probeNow}`);
-    P.stepping = false;
-  }
-  // Re-read every readable characteristic and log values that changed (a device may echo its state).
-  async readBack(){
-    this.lastRead = this.lastRead || {};
-    for (const c of this.chars.filter(c => c.properties.read)){
-      try {
-        const v = hex(new Uint8Array((await c.readValue()).buffer));
-        if (v !== this.lastRead[c.uuid]) log(`${this.label} READ ${short(c.uuid)}: ${v}`, 'rx');
-        this.lastRead[c.uuid] = v;
-      } catch {}
-    }
-  }
-  reacted(){
-    const what = this.probeNow || 'no probe running';
-    const prev = this.probe?.prev || '-';
-    (this.reactions = this.reactions || []).push({t: performance.now(), what, prev});
-    log(`*** ${this.label}: MOVED during ${what}   (previous: ${prev}) ***`, 'err');
-    this.probePause(true);
-  }
-
-  buildInvert(){
-    const n = this.profile.motors;
-    const names = n === 4 ? ['FL', 'FR', 'RL', 'RR'] : ['direction'];
-    this.ui.inv.innerHTML = '<span class="hint">invert</span>';
-    for (let i = 0; i < n; i++){
+  buildSettings(){
+    const car = this.profile.motors === 4;
+    const names = car ? WHEELS : ['direction'];
+    const inv = this.ui.inv;
+    inv.innerHTML = '<span class="hint">invert</span>';
+    names.forEach((nm, i) => {
       const l = document.createElement('label'); l.className = 'hint';
-      l.innerHTML = `<input type="checkbox"> ${names[i]}`;
+      l.innerHTML = `<input type="checkbox"> ${nm}`;
       const cb = l.querySelector('input'); cb.checked = this.cfg.invert[i];
       cb.onchange = () => { this.cfg.invert[i] = cb.checked; this.save(); };
-      this.ui.inv.appendChild(l);
-    }
+      inv.appendChild(l);
+    });
+    this.ui.portRow?.remove(); this.ui.portRow = null;
+    if (!car) return;
+    // which motor port (A-D) drives each wheel, and strafe direction (depends on how the rollers are fitted)
+    const row = document.createElement('div'); row.className = 'row';
+    row.innerHTML = '<span class="hint">ports</span>' + WHEELS.map(w =>
+      `<label class="hint">${w} <select data-w="${w}">${'ABCD'.split('').map(p => `<option>${p}</option>`).join('')}</select></label>`).join('') +
+      '<label class="hint"><input type="checkbox" class="flipx"> swap left/right</label>';
+    this.cfg.ports = Object.assign({}, PB_DEFAULT_PORTS, this.cfg.ports);
+    row.querySelectorAll('select').forEach(s => {
+      s.value = this.cfg.ports[s.dataset.w];
+      s.onchange = () => { this.cfg.ports[s.dataset.w] = s.value; this.save(); };
+    });
+    const fx = row.querySelector('.flipx'); fx.checked = this.cfg.flipX ?? PB_FLIP_STRAFE;
+    fx.onchange = () => { this.cfg.flipX = fx.checked; this.save(); };
+    inv.after(row);
+    this.ui.portRow = row;
   }
 
   buildControls(){
-    this.buildInvert();
+    this.buildSettings();
     const ctl = this.ui.ctl; ctl.textContent = '';
     this.ui.render = this.ui.setNeutral = this.ui.nudge = this.ui.drive = null;
     if (this.profile.motors === 1) this.buildSingle(ctl); else this.buildCar(ctl);
@@ -605,46 +403,79 @@ class Motor {
     this.ui.nudge = step;
   }
 
+  // Mecanum car. drive = {x: strafe right +, y: forward +, w: spin clockwise +}, each -1..1.
+  //   FL = y + x + w   FR = y − x − w   RL = y − x + w   RR = y + x − w
+  // Pure diagonals (|x| = |y|) drive only one pair of opposite wheels; pure w spins in place.
   buildCar(ctl){
+    const D = Math.SQRT1_2;
+    const PAD = [  // [label, x, y, title]
+      ['↖', -D, D, 'diagonal forward-left (one wheel pair)'], ['↑', 0, 1, 'forward'], ['↗', D, D, 'diagonal forward-right (other wheel pair)'],
+      ['←', -1, 0, 'strafe left'], null, ['→', 1, 0, 'strafe right'],
+      ['↙', -D, -D, 'diagonal back-left'], ['↓', 0, -1, 'back'], ['↘', D, -D, 'diagonal back-right'],
+    ];
     ctl.innerHTML = `
-      <div class="note">The car's commands are not known yet; this joystick only shows the wheel mix and sends nothing. Use Advanced → Probe to try candidate frames.</div>
-      <div class="row" style="align-items:flex-start">
-        <div class="joy"><div class="knob"></div></div>
-        <pre class="gatt wheels" style="flex:1"></pre>
+      <div class="drive">
+        <div class="pad">${PAD.map((p, i) => p ? `<button data-i="${i}" title="${p[3]}">${p[0]}</button>` : '<button class="mid">STOP</button>').join('')}</div>
+        <div class="joy" title="analog: drag to move in any direction"><div class="knob"></div></div>
       </div>
-      <div class="motor"><span class="hint">rotate</span>
-        <input type="range" class="rot" min="-100" max="100" value="0"><span class="val rv">0</span></div>`;
-    const joy = ctl.querySelector('.joy'), knob = ctl.querySelector('.knob');
-    const rot = ctl.querySelector('.rot'), rv = ctl.querySelector('.rv'), wheels = ctl.querySelector('.wheels');
+      <div class="spin"><button class="sl" title="spin left in place (Q)">⟲ spin left</button><button class="sr" title="spin right in place (E)">spin right ⟳</button></div>
+      <div class="motor"><span class="hint">turn</span>
+        <input type="range" class="rot" min="-100" max="100" value="0" title="add rotation while driving (springs back)"><span class="val rv">0</span></div>
+      <div class="motor"><span class="hint">speed</span>
+        <input type="range" class="max" min="10" max="100" value="${this.cfg.max ?? 100}"><span class="val mv">${this.cfg.max ?? 100}%</span></div>
+      <div class="wheels">${WHEELS.map(w => `<div class="wheel" data-w="${w}">${w} <span class="v">0</span><div class="bar"><i></i></div></div>`).join('')}</div>`;
+    const q = s => ctl.querySelector(s);
+    const joy = q('.joy'), knob = q('.knob'), rot = q('.rot'), rv = q('.rv'), mx = q('.max'), mv = q('.mv');
     this.drive = {x: 0, y: 0, w: 0};
-    const R = 90, K = 28;
-    const placeKnob = () => {
+    const R = 82, K = 26;
+    const lit = () => {
+      ctl.querySelectorAll('.pad button[data-i]').forEach(b => {
+        const p = PAD[+b.dataset.i];
+        b.classList.toggle('on', Math.abs(p[1] - this.drive.x) < .05 && Math.abs(p[2] - this.drive.y) < .05 && (this.drive.x || this.drive.y));
+      });
+      q('.sl').classList.toggle('on', this.drive.w < 0 && !this.drive.x && !this.drive.y);
+      q('.sr').classList.toggle('on', this.drive.w > 0 && !this.drive.x && !this.drive.y);
       knob.style.left = (R - K + this.drive.x * (R - K)) + 'px';
       knob.style.top = (R - K - this.drive.y * (R - K)) + 'px';
     };
     const mix = () => {
-      const {x, y, w} = this.drive;
-      let s = [y + x + w, y - x - w, y - x + w, y + x - w];   // FL FR RL RR (X-drive)
-      const peak = Math.max(1, ...s.map(Math.abs));
-      this.setSpeeds(s.map(v => v / peak * 100));
-      placeKnob();
+      const {y, w} = this.drive, x = this.drive.x * ((this.cfg.flipX ?? PB_FLIP_STRAFE) ? -1 : 1);
+      const s = [y + x + w, y - x - w, y - x + w, y + x - w];
+      const peak = Math.max(1, ...s.map(Math.abs)), lim = (this.cfg.max ?? 100) / 100;
+      this.setSpeeds(s.map(v => v / peak * 100 * lim));
+      lit();
     };
-    this.ui.render = () => {
-      wheels.textContent = ['FL', 'FR', 'RL', 'RR'].map((n, i) => `${n} ${String(this.speeds[i]).padStart(4)}`).join('\n');
+    const set = (x, y, w) => { this.drive = {x, y, w}; mix(); };
+    const hold = (btn, x, y, w) => {
+      btn.onpointerdown = e => { btn.setPointerCapture(e.pointerId); set(x, y, w); };
+      btn.onpointerup = btn.onpointercancel = () => set(0, 0, 0);
     };
+    ctl.querySelectorAll('.pad button[data-i]').forEach(b => { const p = PAD[+b.dataset.i]; hold(b, p[1], p[2], 0); });
+    q('.pad .mid').onclick = () => this.stop();
+    hold(q('.sl'), 0, 0, -1); hold(q('.sr'), 0, 0, 1);
     const fromEvent = e => {
       const b = joy.getBoundingClientRect();
       let x = (e.clientX - b.left - R) / (R - K), y = -(e.clientY - b.top - R) / (R - K);
       const d = Math.hypot(x, y); if (d > 1){ x /= d; y /= d; }
-      this.drive.x = x; this.drive.y = y; mix();
+      set(x, y, this.drive.w);
     };
     joy.onpointerdown = e => { joy.setPointerCapture(e.pointerId); fromEvent(e); };
     joy.onpointermove = e => { if (joy.hasPointerCapture(e.pointerId)) fromEvent(e); };
-    joy.onpointerup = joy.onpointercancel = () => { this.drive.x = this.drive.y = 0; mix(); };
-    rot.oninput = () => { this.drive.w = +rot.value / 100; rv.textContent = rot.value; mix(); };
-    rot.onpointerup = () => { rot.value = 0; rv.textContent = '0'; this.drive.w = 0; mix(); };
-    this.ui.setNeutral = () => { this.drive = {x: 0, y: 0, w: 0}; rot.value = 0; rv.textContent = '0'; placeKnob(); };
-    this.ui.drive = (x, y, w) => { this.drive = {x, y, w}; mix(); };
+    joy.onpointerup = joy.onpointercancel = () => set(0, 0, this.drive.w);
+    rot.oninput = () => { rv.textContent = rot.value; set(this.drive.x, this.drive.y, +rot.value / 100); };
+    rot.onpointerup = () => { rot.value = 0; rv.textContent = '0'; set(this.drive.x, this.drive.y, 0); };
+    mx.oninput = () => { this.cfg.max = +mx.value; mv.textContent = mx.value + '%'; this.save(); mix(); };
+    this.ui.render = () => {
+      ctl.querySelectorAll('.wheel').forEach((el, i) => {
+        const v = this.speeds[i] || 0;
+        el.querySelector('.v').textContent = (v > 0 ? '+' : '') + v;
+        const bar = el.querySelector('i');
+        bar.style.left = (v < 0 ? 50 + v / 2 : 50) + '%';
+        bar.style.width = Math.abs(v / 2) + '%';
+      });
+    };
+    this.ui.setNeutral = () => { this.drive = {x: 0, y: 0, w: 0}; rot.value = 0; rv.textContent = '0'; lit(); };
+    this.ui.drive = set;
     this.ui.render();
   }
 }
@@ -657,52 +488,50 @@ function select(d){
 /* ======================================================================
  * Connect
  * ==================================================================== */
-async function addDevice(showAll){
+async function addDevice(){
   let bt;
   try {
-    const optionalServices = [SVC, PB_SVC, ...EXTRA_SERVICES];
     bt = SIM ? simDevice()
-      : await navigator.bluetooth.requestDevice(showAll
-        ? { acceptAllDevices: true, optionalServices }
-        : { filters: [{namePrefix: NAME_PREFIX}, {namePrefix: PB_PREFIX}, {services: [SVC]}], optionalServices });
+      : await navigator.bluetooth.requestDevice({
+          filters: [{namePrefix: NAME_PREFIX}, {namePrefix: PB_PREFIX}, {services: [SVC]}],
+          optionalServices: [SVC, PB_SVC],
+        });
   } catch (e){
-    if (e.name !== 'NotFoundError') log(e.message, 'err');
+    if (e.name !== 'NotFoundError') alert(e.message);
     return;
   }
   const existing = devices.find(d => d.bt.id === bt.id);
   if (existing){ select(existing); if (!existing.connected) existing.connect(); return; }
-  const d = new Motor(bt); devices.push(d); select(d);
+  const d = new Device(bt); devices.push(d); select(d);
   await d.connect();
 }
 
-function stopAll(){ devices.forEach(d => d.stop()); log('STOP ALL'); }
+function stopAll(){ devices.forEach(d => d.stop()); }
 
 /* ======================================================================
- * Simulation (?sim): fake JG_JMC motors that answer like the real one
+ * Simulation (?sim): fake devices, every other one is a car
  * ==================================================================== */
 let simCount = 0;
 function simDevice(){
-  const n = ++simCount;
+  const n = ++simCount, car = n % 2 === 0;
   const uuid = s => `0000${s}-0000-1000-8000-00805f9b34fb`;
-  const svc = { uuid: uuid('fff0') };
+  const svc = { uuid: car ? PB_SVC : uuid('fff0') };
   const listeners = [];
-  const notify = { uuid: uuid('fff1'), service: svc, properties: {read: true, notify: true},
-    addEventListener: (t, fn) => listeners.push(fn), startNotifications: async () => notify,
-    readValue: async () => new DataView(frame(0x01, [batt]).buffer) };
-  const write = { uuid: uuid('fff2'), service: svc, properties: {write: true},
-    writeValueWithResponse: () => sleep(25 + Math.random() * 20) };
+  const notify = { uuid: car ? PB_SVC.replace('ffa0', 'ffa2') : uuid('fff1'), properties: {read: true, notify: true},
+    addEventListener: (t, fn) => listeners.push(fn), startNotifications: async () => notify };
+  const write = { uuid: car ? PB_WRITE : uuid('fff2'), properties: {write: true},
+    writeValueWithResponse: () => sleep(15 + Math.random() * 15) };
   svc.getCharacteristics = async () => [notify, write];
   let batt = 100 - n * 7;
   const server = { connected: false, getPrimaryServices: async () => [svc], getPrimaryService: async () => svc };
   const dev = new EventTarget();
   Object.assign(dev, {
-    id: 'sim' + n, name: `JG_JMC-SIM${n}`,
+    id: 'sim' + n, name: car ? 'powerbox' : `JG_JMC-SIM${n}`,
     gatt: {
       connect: async () => {
         await sleep(300); server.connected = true;
         clearInterval(dev.timer);
-        dev.timer = setInterval(() => {
-          if (Math.random() < .1) batt = Math.max(5, batt - 1);
+        if (!car) dev.timer = setInterval(() => {
           const value = new DataView(frame(0x01, [batt]).buffer);
           listeners.forEach(fn => fn({target: {value}}));
         }, 2000);
@@ -720,20 +549,17 @@ function simDevice(){
 const keys = new Set();
 function keyDrive(){
   const d = selected; if (!d?.ui.drive) return;
-  const x = (keys.has('d') ? 1 : 0) - (keys.has('a') ? 1 : 0);
-  const y = (keys.has('w') ? 1 : 0) - (keys.has('s') ? 1 : 0);
+  let x = (keys.has('d') ? 1 : 0) - (keys.has('a') ? 1 : 0);
+  let y = (keys.has('w') ? 1 : 0) - (keys.has('s') ? 1 : 0);
+  if (x && y){ x *= Math.SQRT1_2; y *= Math.SQRT1_2; }
   const w = (keys.has('e') ? 1 : 0) - (keys.has('q') ? 1 : 0);
-  d.ui.drive(x, y, w * 0.6);
+  d.ui.drive(x, y, w);
 }
 addEventListener('keydown', e => {
-  if (e.target.matches?.('input[type=text],input[type=number],textarea,select')) return;
+  if (e.target.matches?.('input[type=text],select')) return;
   if (e.code === 'Space'){ e.preventDefault(); stopAll(); return; }
   const k = e.key.toLowerCase();
   if (/^[1-9]$/.test(k) && devices[+k - 1]){ select(devices[+k - 1]); return; }
-  const prober = devices.find(d => d.probing);
-  if (k === 'r'){ (prober || selected)?.reacted(); e.preventDefault(); return; }
-  if (prober && k === 'p'){ prober.probePause(); e.preventDefault(); return; }
-  if (prober && (k === '[' || k === ']' || k === '\\')){ prober.probeStep(k === '[' ? -1 : k === ']' ? 1 : 0); e.preventDefault(); return; }
   if (k.length === 1 && 'wasdqe'.includes(k)){ if (!keys.has(k)){ keys.add(k); keyDrive(); } e.preventDefault(); return; }
   if ((k === 'arrowup' || k === 'arrowdown') && selected?.ui.nudge){
     selected.ui.nudge(k === 'arrowup' ? 10 : -10); e.preventDefault();
@@ -743,17 +569,13 @@ addEventListener('keyup', e => { const k = e.key.toLowerCase(); if (keys.delete(
 addEventListener('blur', () => { keys.clear(); if (devices.some(d => d.speeds.some(Boolean))) stopAll(); });   // dead-man's switch
 addEventListener('beforeunload', () => devices.forEach(d => d.stop()));
 
-$('#btnAdd').onclick = () => addDevice(false);
-$('#btnAddAll').onclick = () => addDevice(true);
+$('#btnAdd').onclick = addDevice;
 $('#btnStopAll').onclick = stopAll;
-if (SIM){
-  $('#simbar').style.display = 'block';
-  $('#btnAddAll').style.display = 'none';
-} else if (!navigator.bluetooth){
+if (SIM) $('#simbar').style.display = 'block';
+else if (!navigator.bluetooth){
   $('#nosupport').style.display = 'block';
-  $('#btnAdd').disabled = $('#btnAddAll').disabled = true;
+  $('#btnAdd').disabled = true;
 }
-log('ready. ' + (SIM ? 'SIMULATION mode' : 'Web Bluetooth ' + (navigator.bluetooth ? 'available' : 'NOT available')));
 </script>
 </body>
 </html>
