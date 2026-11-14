@@ -1,7 +1,8 @@
 # XP Block / 积木Program BLE protocol
 
 Covers the **XC-6 "POWERPACK"** single motor (battery + Bluetooth, one output shaft, advertises as
-`JG_JMC-xxxx`). The **XC-7** gray omni car is not mapped yet.
+`JG_JMC-xxxx`) and the app's **XC-7** 6-channel page. The gray **"powerbox"** mecanum car is a different
+product and is not mapped (see below).
 
 Sources:
 
@@ -71,23 +72,53 @@ App behaviour (confirmed from captures):
 `5a 6b 01 00 01 64 2b` arrives on `fff1` every 2 s. The payload `0x64` = 100 is **assumed** to be battery %:
 only 100 has been observed so far (fresh batteries).
 
+## XC-7 page (6-channel remote) — confirmed
+
+Captured with an ESP32 posing as an XC-6 motor (`firmware/powerbox_sniffer`, env `esp32dev-motor`) while
+`tools/drive_xc7.py` moved each control on the app's XC-7 page through adb. Same frame, 8-byte payload:
+
+```
+payload = [j1 dir, j1 strength, j2 dir, j2 strength, 01, slider dir, E strength, F strength]
+```
+
+| control (screen in landscape) | dir byte | dir bits | strength byte |
+|---|---|---|---|
+| left joystick, vertical axis **A** | 0 | `01` up, `02` down | 1 |
+| left joystick, horizontal axis **B** | 0 | `04` left, `08` right | 1 |
+| right joystick, vertical axis **C** | 2 | `01` up, `02` down | 3 |
+| right joystick, horizontal axis **D** | 2 | `04` left, `08` right | 3 |
+| slider **E** | 5 | `01` left, `02` right | 6 |
+| slider **F** | 5 | `04` left, `08` right | 7 |
+
+Diagonals OR the bits (`05`, `06`, `09`, `0a`); strength rises 0 → `ff` with the throw. The app streams a frame
+about every 100 ms while a control moves; on release it sends the all-zero frame
+`5a 6b 02 00 08 00 00 00 00 01 00 00 00 d0` five times.
+
+## "powerbox" mecanum car — not mapped
+
+Gray brick chassis, 4 mecanum wheels, own 2.4 GHz remote, no app. Advertises `02 01 05 09 09 "powerbox"` from
+public address `25:02:00:00:1c:43`. GATT: `0000ffa0-0002-1000-8000-00805f9b34fb` (note `-0002-`), with
+`ffa2` read+notify (reads `00 00 00 00`) and `ffa1` write; the generic `1800`/`1801` services as well.
+
+What was tried, all with the wheels in view:
+
+- **XP Block app**: connects, then has nothing to send (it only knows `fff2`).
+- **576 probe packets** on `ffa1` (`index.html` probe panel): known brick-hub protocols (LEGO PU, BuWizz,
+  SBrick, Circuit Cubes), every single byte, `[cmd, speed]` pairs, per-motor 4-byte, 8/20-byte padded,
+  common headers with sum/xor/length, ASCII. Every write accepted, `ffa2` never changed, no wheel moved.
+  Once, during the full run, the car LED switched from solid to **fast blinking** while the BLE link stayed up:
+  the firmware does parse writes. Packets 1–288 alone don't do it; 289–576 not yet bisected.
+- **XC-7 frames streamed** every 100 ms for 2 s per direction/slider: nothing.
+- **The remote is not BLE**: an ESP32 cloning the car exactly (name, address, advertisement bytes, service)
+  got no connection; with the car's address as a BLE central it heard no directed or other advertising from the
+  remote; and the car keeps advertising while paired with the remote. The remote (16-pin chip, 24 MHz
+  crystal, PCB antenna, one button per pin) is a proprietary 2.4 GHz link. While a BLE central is connected
+  the car refuses the remote.
+
 ## Other observations
 
-- With the same motor connected, a different model page in the app sent 8-byte payloads, e.g.
-  `5a 6b 02 00 08 02 2b 00 00 01 00 00 00 fd` and `… 09 b8 00 00 01 00 00 00 …`. Which model
-  page that was is unknown, and so is the layout. The page does not use it.
-- The APK also contains a BLE *advertiser* (`PrepareAdvertise`, manufacturer ID 2402 = `0x0962`, payload
-  built in Dart). XC-6 does not use it. If XC-7 or another model turns out to be advertisement-controlled,
-  a browser cannot drive it directly: Web Bluetooth cannot advertise, so it would need a small
-  ESP32 bridge over Web Serial.
-
-## Open
-
-- Meaning of payload bytes 2–4 (a second channel? LED?).
-- Whether the status byte really is battery % (watch it as the batteries drain).
-- Whether the motor stops on its own when the link drops. The page sends stop on blur, unload and
-  disconnect, so the browser side doesn't depend on it.
-- **XC-7 car**: capture it the same way (see below).
+- The APK also contains a BLE *advertiser* (`PrepareAdvertise`, manufacturer ID 2402 = `0x0962`) that nothing
+  in the Java code calls.
 
 ## Capturing another model (e.g. XC-7)
 
